@@ -32,6 +32,10 @@ const formNama = ref('')
 const formKontak = ref('')
 const formKodeLokasi = ref('')
 
+// Pagination state
+const PAGE_SIZE = 10
+const currentPage = ref(1)
+
 const columns = [
   { accessorKey: 'id', header: 'ID' },
   { accessorKey: 'created_at', header: 'Created At' },
@@ -50,12 +54,20 @@ async function getClientData() {
     const { data, error } = await supabase.from('client').select()
     if (error) throw error
     clientRecords.value = data || []
+    currentPage.value = 1
   } catch (error) {
     errorMsg.value = error.message
   } finally {
     loading.value = false;
   }
 }
+
+const totalPages = computed(() => Math.max(1, Math.ceil(clientRecords.value.length / PAGE_SIZE)))
+
+const paginatedRecords = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return clientRecords.value.slice(start, start + PAGE_SIZE)
+})
 
 // ── INSERT ──────────────────────────────────
 function openInsertModal() {
@@ -219,7 +231,7 @@ watch(user, (newUser) => {
         
         <div v-else class="w-full">
           <UTable 
-            :data="clientRecords" 
+            :data="paginatedRecords" 
             :columns="columns" 
             :loading="loading"
             class="w-full"
@@ -270,6 +282,19 @@ watch(user, (newUser) => {
               </div>
             </template>
           </UTable>
+
+          <!-- Pagination -->
+          <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-4 border-t border-gray-200 dark:border-gray-800">
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Showing {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, clientRecords.length) }} of {{ clientRecords.length }} records
+            </p>
+            <UPagination
+              v-model:page="currentPage"
+              :total="clientRecords.length"
+              :items-per-page="PAGE_SIZE"
+              show-edges
+            />
+          </div>
         </div>
       </UCard>
     </UContainer>

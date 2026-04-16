@@ -47,11 +47,16 @@ const clientList = ref([])
 const statusSort = ref(null)
 const dateSort = ref(null)
 
+// Pagination state
+const PAGE_SIZE = 10
+const currentPage = ref(1)
+
 function toggleStatusSort() {
   // Cycle: null -> asc (pending first) -> desc (completed first) -> null
   if (statusSort.value === null) statusSort.value = 'asc'
   else if (statusSort.value === 'asc') statusSort.value = 'desc'
   else statusSort.value = null
+  currentPage.value = 1
 }
 
 function toggleDateSort() {
@@ -59,6 +64,7 @@ function toggleDateSort() {
   if (dateSort.value === null) dateSort.value = 'desc'
   else if (dateSort.value === 'desc') dateSort.value = 'asc'
   else dateSort.value = null
+  currentPage.value = 1
 }
 
 function sortIcon(direction) {
@@ -89,6 +95,13 @@ const sortedRecords = computed(() => {
   }
 
   return records
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(sortedRecords.value.length / PAGE_SIZE)))
+
+const paginatedRecords = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return sortedRecords.value.slice(start, start + PAGE_SIZE)
 })
 
 const columns = [
@@ -281,6 +294,20 @@ function formatLabel(key) {
     .replace(/\b\w/g, c => c.toUpperCase())
 }
 
+// Format Indonesian phone number to WhatsApp URL
+function openWhatsApp(kontak) {
+  if (!kontak) return
+  // Strip all non-digit characters
+  let phone = String(kontak).replace(/\D/g, '')
+  // Convert leading 0 to country code 62 (Indonesia)
+  if (phone.startsWith('0')) {
+    phone = '62' + phone.slice(1)
+  } else if (!phone.startsWith('62')) {
+    phone = '62' + phone
+  }
+  window.open(`https://wa.me/${phone}`, '_blank')
+}
+
 async function logout() {
   await supabase.auth.signOut()
 }
@@ -339,7 +366,7 @@ watch(user, (newUser) => {
         
         <div v-else class="w-full">
           <UTable 
-            :data="sortedRecords" 
+            :data="paginatedRecords" 
             :columns="columns" 
             :loading="loading"
             class="w-full"
@@ -432,6 +459,19 @@ watch(user, (newUser) => {
               </div>
             </template>
           </UTable>
+
+          <!-- Pagination -->
+          <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-4 border-t border-gray-200 dark:border-gray-800">
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Showing {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, sortedRecords.length) }} of {{ sortedRecords.length }} records
+            </p>
+            <UPagination
+              v-model:page="currentPage"
+              :total="sortedRecords.length"
+              :items-per-page="PAGE_SIZE"
+              show-edges
+            />
+          </div>
         </div>
       </UCard>
     </UContainer>
@@ -455,7 +495,16 @@ watch(user, (newUser) => {
         </div>
       </template>
       <template #footer>
-        <div class="flex justify-end">
+        <div class="flex justify-between items-center w-full">
+          <UButton
+            v-if="detailModalData && detailModalData.kontak"
+            label="WhatsApp"
+            color="success"
+            variant="solid"
+            icon="i-heroicons-chat-bubble-left-ellipsis"
+            @click="openWhatsApp(detailModalData.kontak)"
+          />
+          <div v-else />
           <UButton label="Close" color="neutral" variant="soft" @click="detailModalOpen = false" />
         </div>
       </template>
