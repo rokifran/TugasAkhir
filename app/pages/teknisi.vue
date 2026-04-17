@@ -212,11 +212,11 @@ watch(user, (newUser) => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col p-8 bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
+  <div class="h-full flex flex-col p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
     <UContainer class="w-full max-w-5xl">
-      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 sm:mb-8 gap-4">
         <div>
-          <h1 class="text-3xl font-extrabold mb-2">Teknisi Data</h1>
+          <h1 class="text-2xl sm:text-3xl font-extrabold mb-2">Teknisi Data</h1>
           <p class="text-gray-500 dark:text-gray-400">Manage your technicians here.</p>
         </div>
         <UButton
@@ -241,12 +241,12 @@ watch(user, (newUser) => {
           <UButton to="/login" color="primary">Go to Login</UButton>
         </div>
         
-        <div v-else class="w-full">
+        <div v-else class="w-full overflow-x-auto">
           <UTable 
             :data="paginatedRecords" 
             :columns="columns" 
             :loading="loading"
-            class="w-full"
+            class="w-full min-w-[600px]"
           >
             <template #empty>
               <div class="py-12 text-center text-gray-500">
@@ -266,23 +266,24 @@ watch(user, (newUser) => {
                <span class="font-bold text-gray-900 dark:text-white">{{ row.original.nama || '-' }}</span>
             </template>
             <template #kontak-cell="{ row }">
-               <span class="text-gray-700 dark:text-gray-300">{{ row.original.kontak || '-' }}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-gray-700 dark:text-gray-300">{{ row.original.kontak || '-' }}</span>
+                <UButton
+                  v-if="row.original.kontak"
+                  size="xs"
+                  color="success"
+                  variant="ghost"
+                  icon="i-heroicons-chat-bubble-oval-left-ellipsis"
+                  @click="openWhatsApp(row.original.kontak)"
+                  title="Message on WhatsApp"
+                />
+              </div>
             </template>
             <template #kode_lokasi-cell="{ row }">
                <span class="text-gray-900 dark:text-gray-300 font-mono">{{ row.original.kode_lokasi || '-' }}</span>
             </template>
             <template #actions-cell="{ row }">
               <div class="flex items-center gap-2">
-                <UButton
-                  size="xs"
-                  color="success"
-                  variant="soft"
-                  icon="i-heroicons-chat-bubble-left-ellipsis"
-                  @click="openWhatsApp(row.original.kontak)"
-                  :disabled="!row.original.kontak"
-                >
-                  WA
-                </UButton>
                 <UButton
                   size="xs"
                   color="primary"

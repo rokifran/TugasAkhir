@@ -330,12 +330,12 @@ watch(user, (newUser) => {
 
 <template>
   <div class="h-full bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
-    <UContainer class="py-12 flex flex-col items-center">
-      <div class="w-full max-w-5xl flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-        <h1 class="text-3xl font-extrabold">
+    <UContainer class="py-6 sm:py-8 lg:py-12 flex flex-col items-center">
+      <div class="w-full max-w-5xl flex flex-col md:flex-row justify-between items-start md:items-center mb-6 sm:mb-8 gap-4">
+        <h1 class="text-2xl sm:text-3xl font-extrabold">
           Maintenance Dashboard
         </h1>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
           <template v-if="!user">
             <UButton to="/login" color="primary" variant="solid" size="lg" icon="i-heroicons-arrow-right-on-rectangle">
               Login to View Data
@@ -364,12 +364,12 @@ watch(user, (newUser) => {
           </UButton>
         </div>
         
-        <div v-else class="w-full">
+        <div v-else class="w-full overflow-x-auto pb-4">
           <UTable 
             :data="paginatedRecords" 
             :columns="columns" 
             :loading="loading"
-            class="w-full"
+            class="w-full min-w-[900px]"
           >
             <template #status-header>
               <button

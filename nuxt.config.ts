@@ -9,5 +9,10 @@ export default defineNuxtConfig({
     },
   },
   css: ['~/assets/css/main.css'],
-  modules: ['@nuxtjs/supabase', '@nuxt/ui']
+  modules: ['@nuxtjs/supabase', '@nuxt/ui'],
+  supabase: {
+    cookieOptions: {
+      secure: process.env.NODE_ENV === 'production'
+    }
+  }
 })

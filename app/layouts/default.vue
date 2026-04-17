@@ -1,13 +1,26 @@
 <template>
-  <div class="h-screen flex overflow-hidden bg-white dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300">
-    <!-- Sidebar -->
-    <aside class="w-64 border-r border-gray-200 dark:border-gray-800 flex flex-col h-full bg-gray-50/30 dark:bg-gray-900/30">
-      <div class="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-800 gap-3 shrink-0">
-        <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-500/10 text-primary-500">
-          <UIcon name="i-heroicons-cube-transparent" class="w-5 h-5" />
+  <div class="h-screen flex flex-col overflow-hidden bg-white dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300">
+    <UHeader toggle-side="left" :ui="{ container: 'px-4!' }">
+      <template #toggle>
+        <UButton
+          :icon="open ? 'i-lucide-panel-left-close' : 'i-lucide-panel-left'"
+          color="gray"
+          variant="ghost"
+          aria-label="Toggle sidebar"
+          @click="open = !open"
+        />
+      </template>
+
+      <template #left>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-500/10 text-primary-500">
+            <UIcon name="i-heroicons-cube-transparent" class="w-5 h-5" />
+          </div>
+          <span class="font-bold text-lg tracking-tight flex-1">Mainten<span class="text-primary-500">App</span></span>
         </div>
-        <span class="font-bold text-lg tracking-tight flex-1">Mainten<span class="text-primary-500">App</span></span>
-        
+      </template>
+
+      <template #right>
         <ClientOnly>
           <UButton
             :icon="isDark ? 'i-heroicons-moon-20-solid' : 'i-heroicons-sun-20-solid'"
@@ -20,23 +33,37 @@
             <div class="w-8 h-8" />
           </template>
         </ClientOnly>
-      </div>
-      
-      <!-- Navigation -->
-      <div class="flex-1 overflow-y-auto p-4">
-        <UNavigationMenu :items="links" orientation="vertical" class="w-full" />
-      </div>
-    </aside>
+      </template>
+    </UHeader>
 
-    <!-- Main Content -->
-    <main class="flex-1 flex flex-col h-full overflow-y-auto">
-      <slot />
-    </main>
+    <div class="flex flex-1 min-h-0 relative">
+      <USidebar
+        v-model:open="open"
+        collapsible="icon"
+        :ui="{
+          gap: 'h-[calc(100%-var(--ui-header-height))]',
+          container:
+            'absolute top-(--ui-header-height) bottom-0 h-[calc(100%-var(--ui-header-height))]'
+        }"
+      >
+        <UNavigationMenu
+          :items="links"
+          orientation="vertical"
+          :ui="{ link: 'p-1.5 overflow-hidden' }"
+        />
+      </USidebar>
+
+      <main class="flex-1 flex flex-col h-full overflow-y-auto">
+        <slot />
+      </main>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+
+const open = ref(true)
 
 const colorMode = useColorMode()
 const isDark = computed({
