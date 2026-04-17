@@ -125,6 +125,7 @@ async function getMaintenanceData() {
     const { data, error } = await supabase
       .from('maintenance')
       .select('*, teknisi(*), client(*)')
+      .order('created_at', { ascending: false })
     if (error) throw error
     maintenanceRecords.value = data || []
   } catch (error) {

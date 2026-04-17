@@ -51,7 +51,7 @@ async function getClientData() {
   loading.value = true;
   errorMsg.value = null;
   try {
-    const { data, error } = await supabase.from('client').select()
+    const { data, error } = await supabase.from('client').select().order('created_at', { ascending: false })
     if (error) throw error
     clientRecords.value = data || []
     currentPage.value = 1

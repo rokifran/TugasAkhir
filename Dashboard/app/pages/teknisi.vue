@@ -51,7 +51,7 @@ async function getTeknisiData() {
   loading.value = true;
   errorMsg.value = null;
   try {
-    const { data, error } = await supabase.from('teknisi').select()
+    const { data, error } = await supabase.from('teknisi').select().order('created_at', { ascending: false })
     if (error) throw error
     teknisiRecords.value = data || []
     currentPage.value = 1
