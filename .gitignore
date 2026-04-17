@@ -26,3 +26,4 @@ logs
 # WhatsApp Gateway local auth files
 .wwebjs_auth
 .wwebjs_core
+.wwebjs_cache
