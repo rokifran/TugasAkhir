@@ -22,3 +22,7 @@ logs
 .env
 .env.*
 !.env.example
+
+# WhatsApp Gateway local auth files
+.wwebjs_auth
+.wwebjs_core
