@@ -12,58 +12,8 @@ function getWITATomorrow() {
 }
 
 const handler = async function(event, context) {
-    console.log("Cron remind-tomorrow triggered.");
-    
-    try {
-        const tomorrowStr = getWITATomorrow();
-        console.log(`Checking maintenance for tomorrow's date: ${tomorrowStr}`);
-
-        const { data: maintenanceJobs, error } = await supabase
-            .from('maintenance')
-            .select(`
-                kode_lokasi,
-                teknisi ( kontak ),
-                client ( kontak )
-            `)
-            .eq('tanggal_maintenance', tomorrowStr)
-            .eq('status', false);
-
-        if (error) throw error;
-
-        if (!maintenanceJobs || maintenanceJobs.length === 0) {
-            console.log('No maintenance jobs found for tomorrow.');
-            return { statusCode: 200 };
-        }
-
-        console.log(`Found ${maintenanceJobs.length} maintenance jobs for tomorrow. Sending reminders...`);
-
-        for (const job of maintenanceJobs) {
-            // Send to Technician
-            const techContact = job.teknisi?.kontak;
-            if (techContact) {
-                const techTargetNumber = formatPhoneNumber(techContact);
-                if (techTargetNumber) {
-                    const techMessage = `Dont forget there is a maintenance tomorow on ${job.kode_lokasi}`;
-                    await sendFonnteMessage(techTargetNumber, techMessage);
-                }
-            }
-
-            // Send to Client
-            const clientContact = job.client?.kontak;
-            if (clientContact) {
-                const clientTargetNumber = formatPhoneNumber(clientContact);
-                if (clientTargetNumber) {
-                    const clientMessage = `Dont forget there is a maintenance tomorow`;
-                    await sendFonnteMessage(clientTargetNumber, clientMessage);
-                }
-            }
-        }
-        
-        return { statusCode: 200 };
-    } catch (error) {
-        console.error('Error in remind-tomorrow handler:', error.message);
-        return { statusCode: 500 };
-    }
+    console.log("Cron remind-tomorrow triggered. Note: Fonnte notifications are disabled in favor of self-hosted WhatsappGateway.");
+    return { statusCode: 200 };
 };
 
 // 08:00 WITA is 00:00 UTC. Cron: 0 0 * * *

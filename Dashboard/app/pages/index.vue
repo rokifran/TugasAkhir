@@ -38,10 +38,12 @@ const formClient = ref(null)
 const formKodeLokasi = ref('')
 const formTanggalMaintenance = ref('')
 const formStatus = ref(false)
+const formDevices = ref([])
 
 // Dropdown options (fetched from DB)
 const teknisiList = ref([])
 const clientList = ref([])
+const kategoriPerangkatList = ref([])
 
 // Sorting state: null = no sort, 'asc', 'desc'
 const statusSort = ref(null)
@@ -110,6 +112,7 @@ const columns = [
   { accessorKey: 'status', header: 'Status' },
   { accessorKey: 'teknisi', header: 'Teknisi' },
   { accessorKey: 'client', header: 'Client' },
+  { accessorKey: 'devices', header: 'Perangkat' },
   { accessorKey: 'kode_lokasi', header: 'Kode Lokasi' },
   { accessorKey: 'tanggal_maintenance', header: 'Tanggal Maintenance' },
   { accessorKey: 'actions', header: 'Actions' }
@@ -121,10 +124,10 @@ async function getMaintenanceData() {
   loading.value = true;
   errorMsg.value = null;
   try {
-    // Use Supabase foreign key joins to fetch related teknisi and client data
+    // Use Supabase foreign key joins to fetch related teknisi, client, and maintenance_detail data
     const { data, error } = await supabase
       .from('maintenance')
-      .select('*, teknisi(*), client(*)')
+      .select('*, teknisi(*), client(*), maintenance_detail(*, kategori_perangkat(*))')
       .order('created_at', { ascending: false })
     if (error) throw error
     maintenanceRecords.value = data || []
@@ -137,14 +140,18 @@ async function getMaintenanceData() {
 
 async function fetchDropdownData() {
   try {
-    const [teknisiRes, clientRes] = await Promise.all([
+    const [teknisiRes, clientRes, kategoriRes] = await Promise.all([
       supabase.from('teknisi').select('id, nama'),
-      supabase.from('client').select('id, nama')
+      supabase.from('client').select('id, nama'),
+      supabase.from('kategori_perangkat').select('id, kategori, nama_perangkat')
     ])
     if (teknisiRes.error) throw teknisiRes.error
     if (clientRes.error) throw clientRes.error
+    if (kategoriRes.error) throw kategoriRes.error
+    
     teknisiList.value = teknisiRes.data || []
     clientList.value = clientRes.data || []
+    kategoriPerangkatList.value = kategoriRes.data || []
   } catch (error) {
     errorMsg.value = error.message
   }
@@ -157,6 +164,7 @@ function openInsertModal() {
   formKodeLokasi.value = ''
   formTanggalMaintenance.value = ''
   formStatus.value = false
+  formDevices.value = []
   insertError.value = null
   insertSuccess.value = false
   insertModalOpen.value = true
@@ -174,7 +182,7 @@ async function insertMaintenance() {
   insertSuccess.value = false
 
   try {
-    const { error } = await supabase
+    const { data: newRecord, error } = await supabase
       .from('maintenance')
       .insert({
         teknisi: formTeknisi.value,
@@ -182,7 +190,23 @@ async function insertMaintenance() {
         kode_lokasi: formKodeLokasi.value.trim(),
         tanggal_maintenance: formTanggalMaintenance.value
       })
+      .select()
+      .single()
     if (error) throw error
+
+    // Insert maintenance details if any devices are specified
+    const validDevices = formDevices.value.filter(d => d.kategori_perangkat_id)
+    if (validDevices.length > 0) {
+      const details = validDevices.map(d => ({
+        maintenance_id: newRecord.id,
+        kategori_perangkat_id: d.kategori_perangkat_id,
+        catatan_kerusakan: d.catatan_kerusakan.trim()
+      }))
+      const { error: detailError } = await supabase
+        .from('maintenance_detail')
+        .insert(details)
+      if (detailError) throw detailError
+    }
 
     insertSuccess.value = true
     await getMaintenanceData()
@@ -199,12 +223,17 @@ async function insertMaintenance() {
 // ── EDIT ────────────────────────────────────
 function openEditModal(record) {
   editRecordId.value = record.id
-  // Extract the FK id — if joined object, use its id; otherwise use the raw value
   formTeknisi.value = record.teknisi && typeof record.teknisi === 'object' ? record.teknisi.id : record.teknisi
   formClient.value = record.client && typeof record.client === 'object' ? record.client.id : record.client
   formKodeLokasi.value = record.kode_lokasi || ''
   formTanggalMaintenance.value = record.tanggal_maintenance || ''
   formStatus.value = !!record.status
+  formDevices.value = record.maintenance_detail
+    ? record.maintenance_detail.map(d => ({
+        kategori_perangkat_id: d.kategori_perangkat_id,
+        catatan_kerusakan: d.catatan_kerusakan || ''
+      }))
+    : []
   editError.value = null
   editSuccess.value = false
   editModalOpen.value = true
@@ -233,6 +262,27 @@ async function updateMaintenance() {
       })
       .eq('id', editRecordId.value)
     if (error) throw error
+
+    // Delete existing details for this maintenance
+    const { error: deleteError } = await supabase
+      .from('maintenance_detail')
+      .delete()
+      .eq('maintenance_id', editRecordId.value)
+    if (deleteError) throw deleteError
+
+    // Insert new details
+    const validDevices = formDevices.value.filter(d => d.kategori_perangkat_id)
+    if (validDevices.length > 0) {
+      const details = validDevices.map(d => ({
+        maintenance_id: editRecordId.value,
+        kategori_perangkat_id: d.kategori_perangkat_id,
+        catatan_kerusakan: d.catatan_kerusakan.trim()
+      }))
+      const { error: detailError } = await supabase
+        .from('maintenance_detail')
+        .insert(details)
+      if (detailError) throw detailError
+    }
 
     editSuccess.value = true
     await getMaintenanceData()
@@ -274,12 +324,27 @@ async function deleteMaintenance() {
   }
 }
 
+// Helper methods for devices form
+function addDeviceField() {
+  formDevices.value.push({ kategori_perangkat_id: null, catatan_kerusakan: '' })
+}
+
+function removeDeviceField(index) {
+  formDevices.value.splice(index, 1)
+}
+
 // Computed options for selects
 const teknisiOptions = computed(() =>
   teknisiList.value.map(t => ({ label: t.nama, value: t.id }))
 )
 const clientOptions = computed(() =>
   clientList.value.map(c => ({ label: c.nama, value: c.id }))
+)
+const kategoriPerangkatOptions = computed(() =>
+  kategoriPerangkatList.value.map(k => ({
+    label: `${k.kategori} - ${k.nama_perangkat}`,
+    value: k.id
+  }))
 )
 
 function showDetail(type, data) {
@@ -429,6 +494,25 @@ watch(user, (newUser) => {
               </button>
               <span v-else class="text-gray-400">-</span>
             </template>
+            <template #devices-cell="{ row }">
+              <div class="flex flex-col gap-1 max-w-[220px]">
+                <div 
+                  v-for="detail in row.original.maintenance_detail" 
+                  :key="detail.id"
+                  class="text-xs flex flex-col gap-0.5 border-b border-gray-100 dark:border-gray-800 last:border-0 pb-1 last:pb-0"
+                >
+                  <span class="font-semibold text-gray-800 dark:text-gray-200">
+                    {{ detail.kategori_perangkat?.kategori }} - {{ detail.kategori_perangkat?.nama_perangkat }}
+                  </span>
+                  <span class="text-gray-500 dark:text-gray-400 italic text-[11px]" v-if="detail.catatan_kerusakan">
+                    "{{ detail.catatan_kerusakan }}"
+                  </span>
+                </div>
+                <span v-if="!row.original.maintenance_detail || row.original.maintenance_detail.length === 0" class="text-gray-450 dark:text-gray-500 text-xs italic">
+                  Tidak ada perangkat
+                </span>
+              </div>
+            </template>
             <template #kode_lokasi-cell="{ row }">
                <span class="font-bold text-gray-900 dark:text-white">{{ row.original.kode_lokasi || '-' }}</span>
             </template>
@@ -561,6 +645,57 @@ watch(user, (newUser) => {
               class="w-full"
             />
           </div>
+
+          <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
+            <div class="flex items-center justify-between mb-3">
+              <label class="text-sm font-semibold text-gray-900 dark:text-white">Perangkat Bermasalah</label>
+              <UButton
+                label="Tambah Perangkat"
+                icon="i-heroicons-plus-circle"
+                size="xs"
+                color="primary"
+                variant="subtle"
+                @click="addDeviceField"
+              />
+            </div>
+            
+            <div v-if="formDevices.length === 0" class="text-center py-6 border border-dashed border-gray-200 dark:border-gray-850 rounded-xl bg-gray-50/50 dark:bg-gray-900/30">
+              <UIcon name="i-heroicons-wrench" class="w-6 h-6 text-gray-400 mx-auto mb-1.5 opacity-60" />
+              <p class="text-xs text-gray-500 dark:text-gray-400">Belum ada perangkat yang dipilih.</p>
+            </div>
+            
+            <div class="space-y-3 max-h-52 overflow-y-auto pr-1" v-else>
+              <div 
+                v-for="(device, index) in formDevices" 
+                :key="index"
+                class="flex items-start gap-2.5 p-3 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-150 dark:border-gray-800"
+              >
+                <div class="flex-1 space-y-2">
+                  <USelectMenu
+                    v-model="device.kategori_perangkat_id"
+                    :items="kategoriPerangkatOptions"
+                    placeholder="Pilih perangkat..."
+                    value-key="value"
+                    class="w-full"
+                  />
+                  <UInput
+                    v-model="device.catatan_kerusakan"
+                    placeholder="Catatan kerusakan (opsional)..."
+                    size="sm"
+                    class="w-full"
+                  />
+                </div>
+                <UButton
+                  icon="i-heroicons-trash"
+                  color="red"
+                  variant="ghost"
+                  size="sm"
+                  class="mt-1"
+                  @click="removeDeviceField(index)"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </template>
       <template #footer>
@@ -620,6 +755,57 @@ watch(user, (newUser) => {
               size="lg"
               class="w-full"
             />
+          </div>
+
+          <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
+            <div class="flex items-center justify-between mb-3">
+              <label class="text-sm font-semibold text-gray-900 dark:text-white">Perangkat Bermasalah</label>
+              <UButton
+                label="Tambah Perangkat"
+                icon="i-heroicons-plus-circle"
+                size="xs"
+                color="primary"
+                variant="subtle"
+                @click="addDeviceField"
+              />
+            </div>
+            
+            <div v-if="formDevices.length === 0" class="text-center py-6 border border-dashed border-gray-200 dark:border-gray-850 rounded-xl bg-gray-50/50 dark:bg-gray-900/30">
+              <UIcon name="i-heroicons-wrench" class="w-6 h-6 text-gray-400 mx-auto mb-1.5 opacity-60" />
+              <p class="text-xs text-gray-500 dark:text-gray-400">Belum ada perangkat yang dipilih.</p>
+            </div>
+            
+            <div class="space-y-3 max-h-52 overflow-y-auto pr-1" v-else>
+              <div 
+                v-for="(device, index) in formDevices" 
+                :key="index"
+                class="flex items-start gap-2.5 p-3 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-150 dark:border-gray-800"
+              >
+                <div class="flex-1 space-y-2">
+                  <USelectMenu
+                    v-model="device.kategori_perangkat_id"
+                    :items="kategoriPerangkatOptions"
+                    placeholder="Pilih perangkat..."
+                    value-key="value"
+                    class="w-full"
+                  />
+                  <UInput
+                    v-model="device.catatan_kerusakan"
+                    placeholder="Catatan kerusakan (opsional)..."
+                    size="sm"
+                    class="w-full"
+                  />
+                </div>
+                <UButton
+                  icon="i-heroicons-trash"
+                  color="red"
+                  variant="ghost"
+                  size="sm"
+                  class="mt-1"
+                  @click="removeDeviceField(index)"
+                />
+              </div>
+            </div>
           </div>
 
           <div class="flex items-center gap-3">

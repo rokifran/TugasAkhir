@@ -66,6 +66,32 @@ function formatPhoneNumber(number) {
 }
 
 /**
+ * Safely sends a message to a WhatsApp ID, verifying if it is registered
+ */
+async function safeSendMessage(chatId, message, contactLabel) {
+    try {
+        if (!client.info || !client.info.wid) {
+            console.error(`WhatsApp client is not ready. Failed to send message to ${contactLabel}.`);
+            return false;
+        }
+
+        // Verify if number is registered on WhatsApp
+        const isRegistered = await client.isRegisteredUser(chatId);
+        if (!isRegistered) {
+            console.warn(`Phone number ${contactLabel} (${chatId}) is not registered on WhatsApp.`);
+            return false;
+        }
+
+        await client.sendMessage(chatId, message);
+        console.log(`Message successfully sent to ${contactLabel}`);
+        return true;
+    } catch (error) {
+        console.error(`Error sending message to ${contactLabel} (${chatId}):`, error.message);
+        return false;
+    }
+}
+
+/**
  * Main logic to fetch today's maintenance and send reminders
  */
 async function sendMaintenanceReminders() {
@@ -103,12 +129,7 @@ async function sendMaintenanceReminders() {
             const chatId = formatPhoneNumber(contact);
             const message = `Dont forget there is a maintenance today on ${job.kode_lokasi}`;
 
-            try {
-                await client.sendMessage(chatId, message);
-                console.log(`Reminder sent to ${contact} for ${job.kode_lokasi}`);
-            } catch (sendError) {
-                console.error(`Failed to send message to ${contact}:`, sendError.message);
-            }
+            await safeSendMessage(chatId, message, `technician ${contact}`);
         }
     } catch (error) {
         console.error('Error in sendMaintenanceReminders:', error.message);
@@ -130,7 +151,10 @@ async function sendTomorrowMaintenanceReminders() {
             .select(`
                 kode_lokasi,
                 teknisi ( kontak ),
-                client ( kontak )
+                client ( kontak ),
+                maintenance_detail (
+                    kategori_perangkat ( nama_perangkat )
+                )
             `)
             .eq('tanggal_maintenance', tomorrowStr)
             .eq('status', false);
@@ -145,15 +169,19 @@ async function sendTomorrowMaintenanceReminders() {
         console.log(`Found ${maintenanceJobs.length} maintenance jobs for tomorrow. Sending reminders...`);
 
         for (const job of maintenanceJobs) {
+            // Extract and format the list of devices
+            const details = job.maintenance_detail || [];
+            const deviceNames = details
+                .map(d => d.kategori_perangkat?.nama_perangkat)
+                .filter(Boolean);
+            const devicesStr = deviceNames.length > 0 ? deviceNames.join(', ') : 'Tidak ada perangkat';
+
             // Send to Technician
             const techContact = job.teknisi?.kontak;
             if (techContact) {
                 const techChatId = formatPhoneNumber(techContact);
-                const techMessage = `Dont forget there is a maintenance tomorow on ${job.kode_lokasi}`;
-                try {
-                    await client.sendMessage(techChatId, techMessage);
-                    console.log(`Tomorrow reminder sent to technician ${techContact} for ${job.kode_lokasi}`);
-                } catch (e) { console.error(`Failed tech message to ${techContact}:`, e.message); }
+                const techMessage = `Jangan lupa ada maintenance besok di ${job.kode_lokasi} untuk perbaikan perangkat: ${devicesStr}.`;
+                await safeSendMessage(techChatId, techMessage, `technician ${techContact}`);
             }
 
             // Send to Client
@@ -161,10 +189,7 @@ async function sendTomorrowMaintenanceReminders() {
             if (clientContact) {
                 const clientChatId = formatPhoneNumber(clientContact);
                 const clientMessage = `Dont forget there is a maintenance tomorow`;
-                try {
-                    await client.sendMessage(clientChatId, clientMessage);
-                    console.log(`Tomorrow reminder sent to client ${clientContact}`);
-                } catch (e) { console.error(`Failed client message to ${clientContact}:`, e.message); }
+                await safeSendMessage(clientChatId, clientMessage, `client ${clientContact}`);
             }
         }
     } catch (error) {

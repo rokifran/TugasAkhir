@@ -1,15 +1,24 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 definePageMeta({
   layout: false
 })
 
 const supabase = useSupabaseClient()
+const user = useSupabaseUser()
 const email = ref('')
 const password = ref('')
 const errorMsg = ref(null)
 const loading = ref(false)
+
+// Watch for the user to be fully hydrated before navigating
+watch(user, (newUser) => {
+  const userId = newUser?.id || newUser?.sub || newUser?.user?.id
+  if (newUser && userId) {
+    navigateTo('/')
+  }
+}, { immediate: true })
 
 const handleLogin = async () => {
   loading.value = true
@@ -23,8 +32,7 @@ const handleLogin = async () => {
     
     if (error) throw error
     
-    // On success, navigate back to home
-    navigateTo('/')
+    // Navigation is handled by the watcher above once the user state updates
   } catch (err) {
     errorMsg.value = err.message || 'An error occurred during login.'
   } finally {

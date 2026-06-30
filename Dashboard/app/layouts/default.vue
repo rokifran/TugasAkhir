@@ -75,21 +75,34 @@ const isDark = computed({
   }
 })
 
-const links = computed(() => [
-  {
-    label: 'Dashboard',
-    icon: 'i-heroicons-home',
-    to: '/'
-  },
-  {
-    label: 'Teknisi',
-    icon: 'i-heroicons-wrench-screwdriver',
-    to: '/teknisi'
-  },
-  {
-    label: 'Client',
-    icon: 'i-heroicons-building-office-2',
-    to: '/client'
+const roleState = useState('user-role')
+
+const links = computed(() => {
+  if (roleState.value === 'Teknisi') {
+    return [
+      {
+        label: 'Portal Teknisi',
+        icon: 'i-heroicons-wrench-screwdriver',
+        to: '/teknisi-dashboard'
+      }
+    ]
   }
-])
+  return [
+    {
+      label: 'Dashboard',
+      icon: 'i-heroicons-home',
+      to: '/'
+    },
+    {
+      label: 'Teknisi',
+      icon: 'i-heroicons-wrench-screwdriver',
+      to: '/teknisi'
+    },
+    {
+      label: 'Client',
+      icon: 'i-heroicons-building-office-2',
+      to: '/client'
+    }
+  ]
+})
 </script>

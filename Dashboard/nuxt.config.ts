@@ -11,6 +11,7 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   modules: ['@nuxtjs/supabase', '@nuxt/ui'],
   supabase: {
+    redirect: false,
     cookieOptions: {
       secure: process.env.NODE_ENV === 'production'
     }
