@@ -24,10 +24,10 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // 1. Update public.users
+    // 1. Update public.users to be active
     const { error: usersError } = await supabaseAdmin
       .from('users')
-      .update({ is_active: false })
+      .update({ is_active: true })
       .eq('id', id)
 
     if (usersError) throw usersError

@@ -36,6 +36,13 @@ const deactivateError = ref(null)
 const deactivateRecordId = ref(null)
 const deactivateRecordLabel = ref('')
 
+// Activate Modal state
+const activateModalOpen = ref(false)
+const activateLoading = ref(false)
+const activateError = ref(null)
+const activateRecordId = ref(null)
+const activateRecordLabel = ref('')
+
 // Form fields (shared between insert & edit)
 const formNama = ref('')
 const formKontak = ref('')
@@ -51,6 +58,7 @@ const columns = [
   { accessorKey: 'nama', header: 'Nama' },
   { accessorKey: 'kontak', header: 'Kontak' },
   { accessorKey: 'kode_lokasi', header: 'Kode Lokasi' },
+  { accessorKey: 'status', header: 'Status' },
   { accessorKey: 'actions', header: 'Actions' }
 ]
 
@@ -60,7 +68,7 @@ async function getTeknisiData() {
   loading.value = true;
   errorMsg.value = null;
   try {
-    const { data, error } = await supabase.from('teknisi').select('*, user_id').order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('teknisi').select('*, users(is_active)').order('created_at', { ascending: false })
     if (error) throw error
     teknisiRecords.value = data || []
     currentPage.value = 1
@@ -71,11 +79,26 @@ async function getTeknisiData() {
   }
 }
 
-const totalPages = computed(() => Math.max(1, Math.ceil(teknisiRecords.value.length / PAGE_SIZE)))
+const searchQuery = useState('search-query', () => '')
+
+const filteredTeknisiRecords = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return teknisiRecords.value
+  }
+  const q = searchQuery.value.toLowerCase().trim()
+  return teknisiRecords.value.filter(record => {
+    const namaMatches = record.nama ? record.nama.toLowerCase().includes(q) : false
+    const kodeLokasiMatches = record.kode_lokasi ? record.kode_lokasi.toLowerCase().includes(q) : false
+    const idMatches = record.id ? record.id.toLowerCase().includes(q) : false
+    return namaMatches || kodeLokasiMatches || idMatches
+  })
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredTeknisiRecords.value.length / PAGE_SIZE)))
 
 const paginatedRecords = computed(() => {
   const start = (currentPage.value - 1) * PAGE_SIZE
-  return teknisiRecords.value.slice(start, start + PAGE_SIZE)
+  return filteredTeknisiRecords.value.slice(start, start + PAGE_SIZE)
 })
 
 // ── INSERT ──────────────────────────────────
@@ -186,6 +209,13 @@ function openDeactivateModal(record) {
   deactivateModalOpen.value = true
 }
 
+function openActivateModal(record) {
+  activateRecordId.value = record.user_id
+  activateRecordLabel.value = record.nama || record.id
+  activateError.value = null
+  activateModalOpen.value = true
+}
+
 async function deleteTeknisi() {
   deleteLoading.value = true
   deleteError.value = null
@@ -224,6 +254,25 @@ async function deactivateTeknisi() {
   }
 }
 
+async function activateTeknisi() {
+  activateLoading.value = true
+  activateError.value = null
+
+  try {
+    await $fetch('/api/teknisi/activate', {
+      method: 'POST',
+      body: { id: activateRecordId.value }
+    })
+
+    await getTeknisiData()
+    activateModalOpen.value = false
+  } catch (error) {
+    activateError.value = error.data?.statusMessage || error.message || 'An error occurred.'
+  } finally {
+    activateLoading.value = false
+  }
+}
+
 // Format Indonesian phone number to WhatsApp URL
 function openWhatsApp(kontak) {
   if (!kontak) return
@@ -250,130 +299,157 @@ watch(user, (newUser) => {
     teknisiRecords.value = []
   }
 })
+
+watch(searchQuery, () => {
+  currentPage.value = 1
+})
 </script>
 
 <template>
-  <div class="h-full flex flex-col p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
-    <UContainer class="w-full max-w-5xl">
-      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 sm:mb-8 gap-4">
-        <div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold mb-2">Teknisi Data</h1>
-          <p class="text-gray-500 dark:text-gray-400">Manage your technicians here.</p>
-        </div>
-        <UButton
+  <main class="flex-1 p-lg max-w-container-max mx-auto w-full bg-background font-body-md text-on-surface h-full">
+    <!-- Header Section -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-xl gap-md mt-6">
+      <div>
+        <h1 class="font-display text-display text-on-surface">Teknisi Data</h1>
+        <p class="text-secondary font-body-md mt-1">Manage your technicians here.</p>
+      </div>
+      <div class="flex items-center gap-sm">
+        <button
           v-if="user"
           @click="openInsertModal"
-          color="primary"
-          variant="solid"
-          size="lg"
-          icon="i-heroicons-plus-circle"
+          class="flex items-center gap-sm px-lg py-sm bg-primary-container text-on-primary rounded-lg font-label-bold hover:brightness-105 transition-all shadow-sm active:scale-95"
         >
-          Add Teknisi
-        </UButton>
+          <span class="material-symbols-outlined text-[20px]">add</span>
+          <span>Add Teknisi</span>
+        </button>
       </div>
+    </div>
 
-      <UAlert v-if="errorMsg" icon="i-heroicons-exclamation-triangle" color="red" variant="soft" :title="errorMsg" class="w-full mb-8" />
-      
-      <UCard :ui="{ rounded: 'rounded-2xl' }" class="shadow-xl ring-1 ring-gray-200 dark:ring-gray-800">
-        <div v-if="!user" class="py-12 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
-          <UIcon name="i-heroicons-lock-closed" class="w-16 h-16 mb-4 opacity-50" />
-          <p class="text-lg font-medium mb-3">Access Restricted</p>
-          <p class="text-sm mb-6">Please log in to view the technician records.</p>
-          <UButton to="/login" color="primary">Go to Login</UButton>
-        </div>
-        
-        <div v-else class="w-full overflow-x-auto">
-          <UTable 
-            :data="paginatedRecords" 
-            :columns="columns" 
-            :loading="loading"
-            class="w-full min-w-[600px]"
-          >
-            <template #empty>
-              <div class="py-12 text-center text-gray-500">
-                <UIcon name="i-heroicons-circle-stack-solid" class="w-12 h-12 mb-4 mx-auto" />
-                <p>No Data Found.</p>
-              </div>
-            </template>
-            <template #id-cell="{ row }">
-               <span class="font-mono text-gray-500 dark:text-gray-400" :title="row.original.id">
-                 {{ row.original.id ? row.original.id.substring(0,8) + '...' : '-' }}
-               </span>
-            </template>
-            <template #created_at-cell="{ row }">
-              <span class="text-sm">{{ row.original.created_at ? new Date(row.original.created_at).toLocaleString() : 'N/A' }}</span>
-            </template>
-            <template #nama-cell="{ row }">
-               <span class="font-bold text-gray-900 dark:text-white">{{ row.original.nama || '-' }}</span>
-            </template>
-            <template #kontak-cell="{ row }">
-              <div class="flex items-center gap-2">
-                <span class="text-gray-700 dark:text-gray-300">{{ row.original.kontak || '-' }}</span>
-                <UButton
-                  v-if="row.original.kontak"
-                  size="xs"
-                  color="success"
-                  variant="ghost"
-                  icon="i-heroicons-chat-bubble-oval-left-ellipsis"
-                  @click="openWhatsApp(row.original.kontak)"
-                  title="Message on WhatsApp"
-                />
-              </div>
-            </template>
-            <template #kode_lokasi-cell="{ row }">
-               <span class="text-gray-900 dark:text-gray-300 font-mono">{{ row.original.kode_lokasi || '-' }}</span>
-            </template>
-            <template #actions-cell="{ row }">
-              <div class="flex items-center gap-2">
-                <UButton
-                  size="xs"
-                  color="primary"
-                  variant="soft"
-                  icon="i-heroicons-pencil-square"
-                  @click="openEditModal(row.original)"
-                >
-                  Edit
-                </UButton>
-                <UButton
-                  size="xs"
-                  color="error"
-                  variant="soft"
-                  icon="i-heroicons-trash"
-                  @click="openDeleteModal(row.original)"
-                >
-                  Delete
-                </UButton>
-                <UButton
-                  size="xs"
-                  color="warning"
-                  variant="soft"
-                  icon="i-heroicons-user-minus"
-                  @click="openDeactivateModal(row.original)"
-                >
-                  Deactivate
-                </UButton>
-              </div>
-            </template>
-          </UTable>
+    <UAlert v-if="errorMsg" icon="i-heroicons-exclamation-triangle" color="red" variant="soft" :title="errorMsg" class="w-full mb-8" />
 
-          <!-- Pagination -->
-          <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-4 border-t border-gray-200 dark:border-gray-800">
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              Showing {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, teknisiRecords.length) }} of {{ teknisiRecords.length }} records
-            </p>
-            <UPagination
-              v-model:page="currentPage"
-              :total="teknisiRecords.length"
-              :items-per-page="PAGE_SIZE"
-              show-edges
-            />
-          </div>
-        </div>
-      </UCard>
-    </UContainer>
+    <div v-if="!user" class="py-12 flex flex-col items-center justify-center text-secondary">
+      <span class="material-symbols-outlined text-[48px] mb-4 opacity-50">lock</span>
+      <p class="text-lg font-medium mb-3 text-on-surface">Access Restricted</p>
+      <p class="text-sm mb-6">Please log in to view the technician records.</p>
+      <UButton to="/login" color="primary">Go to Login</UButton>
+    </div>
 
+    <div v-else class="bg-surface-container-lowest rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant overflow-hidden mb-xl">
+      <div class="px-lg py-md border-b border-surface-variant flex items-center justify-between">
+        <h3 class="font-headline-md text-on-surface text-[18px]">Teknisi Records</h3>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse min-w-[800px]">
+          <thead>
+            <tr class="bg-surface-container-low">
+              <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">ID</th>
+              <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Created At</th>
+              <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Nama</th>
+              <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Kontak</th>
+              <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Kode Lokasi</th>
+              <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Status</th>
+              <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-surface-variant">
+            <tr v-if="loading" class="bg-surface-container-lowest">
+              <td colspan="7" class="px-lg py-xl text-center text-secondary">Loading...</td>
+            </tr>
+            <tr v-else-if="paginatedRecords.length === 0" class="bg-surface-container-lowest">
+              <td colspan="7" class="px-lg py-xl text-center text-secondary">No Data Found.</td>
+            </tr>
+            <tr v-else v-for="record in paginatedRecords" :key="record.id" class="hover:bg-surface-container-low/30 transition-colors group">
+              <td class="px-lg py-md font-label-bold text-on-surface">{{ record.id ? record.id.substring(0,8) + '...' : '-' }}</td>
+              <td class="px-lg py-md text-secondary text-sm">{{ record.created_at ? new Date(record.created_at).toLocaleString() : 'N/A' }}</td>
+              <td class="px-lg py-md font-bold text-on-surface">{{ record.nama || '-' }}</td>
+              <td class="px-lg py-md">
+                <div class="flex items-center gap-2">
+                  <span class="text-secondary">{{ record.kontak || '-' }}</span>
+                  <UButton
+                    v-if="record.kontak"
+                    size="xs"
+                    color="primary"
+                    variant="soft"
+                    icon="i-heroicons-chat-bubble-oval-left-ellipsis"
+                    @click="openWhatsApp(record.kontak)"
+                    title="Message on WhatsApp"
+                  />
+                </div>
+              </td>
+              <td class="px-lg py-md text-on-surface font-bold text-sm">{{ record.kode_lokasi || '-' }}</td>
+              <td class="px-lg py-md">
+                <span v-if="record.users?.is_active" class="inline-flex items-center px-sm py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-label-bold border border-emerald-200 uppercase tracking-tighter">
+                  <span class="w-1 h-1 rounded-full bg-emerald-500 mr-1.5"></span>
+                  Active
+                </span>
+                <span v-else class="inline-flex items-center px-sm py-1 rounded-full bg-amber-50 text-amber-700 text-[10px] font-label-bold border border-amber-200 uppercase tracking-tighter">
+                  <span class="w-1 h-1 rounded-full bg-amber-500 mr-1.5"></span>
+                  Inactive
+                </span>
+              </td>
+              <td class="px-lg py-md text-right">
+                <div class="flex items-center justify-end gap-2">
+                  <UButton
+                    size="xs"
+                    color="primary"
+                    variant="soft"
+                    icon="i-heroicons-pencil-square"
+                    @click="openEditModal(record)"
+                  >
+                    Edit
+                  </UButton>
+                  <UButton
+                    size="xs"
+                    color="error"
+                    variant="soft"
+                    icon="i-heroicons-trash"
+                    @click="openDeleteModal(record)"
+                  >
+                    Delete
+                  </UButton>
+                  <UButton
+                    v-if="record.users?.is_active"
+                    size="xs"
+                    color="warning"
+                    variant="soft"
+                    icon="i-heroicons-user-minus"
+                    @click="openDeactivateModal(record)"
+                  >
+                    Deactivate
+                  </UButton>
+                  <UButton
+                    v-else
+                    size="xs"
+                    color="success"
+                    variant="soft"
+                    icon="i-heroicons-user-plus"
+                    @click="openActivateModal(record)"
+                  >
+                    Activate
+                  </UButton>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- Pagination -->
+      <div v-if="totalPages > 1" class="px-lg py-md bg-surface-container-low border-t border-surface-variant flex items-center justify-between">
+        <p class="text-[11px] text-secondary font-label-md">
+          Showing {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, filteredTeknisiRecords.length) }} of {{ filteredTeknisiRecords.length }} records
+        </p>
+        <UPagination
+          v-model:page="currentPage"
+          :total="filteredTeknisiRecords.length"
+          :items-per-page="PAGE_SIZE"
+          show-edges
+        />
+      </div>
+    </div>
+
+    <!-- Modals (keeping Nuxt UI Modal components since Stitch design doesn't provide a custom modal) -->
     <!-- Insert Teknisi Modal -->
-    <UModal v-model:open="insertModalOpen" title="Add Teknisi" description="Fill in the details to add a new technician.">
+    <UModal v-model:open="insertModalOpen" title="Add Teknisi" description="Fill in the details to add a new technician." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="insertError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="insertError" />
@@ -381,59 +457,27 @@ watch(user, (newUser) => {
 
           <div>
             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Email</label>
-            <UInput
-              v-model="formEmail"
-              type="email"
-              placeholder="email@example.com"
-              icon="i-heroicons-envelope"
-              size="lg"
-              class="w-full"
-            />
+            <UInput v-model="formEmail" type="email" placeholder="email@example.com" icon="i-heroicons-envelope" size="lg" class="w-full" />
           </div>
 
           <div>
             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Password</label>
-            <UInput
-              v-model="formPassword"
-              type="password"
-              placeholder="••••••••"
-              icon="i-heroicons-lock-closed"
-              size="lg"
-              class="w-full"
-            />
+            <UInput v-model="formPassword" type="password" placeholder="••••••••" icon="i-heroicons-lock-closed" size="lg" class="w-full" />
           </div>
 
           <div>
             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Nama</label>
-            <UInput
-              v-model="formNama"
-              placeholder="e.g. Ahmad Rizki"
-              icon="i-heroicons-user"
-              size="lg"
-              class="w-full"
-            />
+            <UInput v-model="formNama" placeholder="e.g. Ahmad Rizki" icon="i-heroicons-user" size="lg" class="w-full" />
           </div>
 
           <div>
             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Kontak</label>
-            <UInput
-              v-model="formKontak"
-              placeholder="e.g. 081234567890"
-              icon="i-heroicons-phone"
-              size="lg"
-              class="w-full"
-            />
+            <UInput v-model="formKontak" placeholder="e.g. 081234567890" icon="i-heroicons-phone" size="lg" class="w-full" />
           </div>
 
           <div>
             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Kode Lokasi</label>
-            <UInput
-              v-model="formKodeLokasi"
-              placeholder="e.g. LOK-001"
-              icon="i-heroicons-map-pin"
-              size="lg"
-              class="w-full"
-            />
+            <UInput v-model="formKodeLokasi" placeholder="e.g. LOK-001" icon="i-heroicons-map-pin" size="lg" class="w-full" />
           </div>
         </div>
       </template>
@@ -446,7 +490,7 @@ watch(user, (newUser) => {
     </UModal>
 
     <!-- Edit Teknisi Modal -->
-    <UModal v-model:open="editModalOpen" title="Edit Teknisi" description="Update the technician details.">
+    <UModal v-model:open="editModalOpen" title="Edit Teknisi" description="Update the technician details." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="editError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="editError" />
@@ -454,35 +498,17 @@ watch(user, (newUser) => {
 
           <div>
             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Nama</label>
-            <UInput
-              v-model="formNama"
-              placeholder="e.g. Ahmad Rizki"
-              icon="i-heroicons-user"
-              size="lg"
-              class="w-full"
-            />
+            <UInput v-model="formNama" placeholder="e.g. Ahmad Rizki" icon="i-heroicons-user" size="lg" class="w-full" />
           </div>
 
           <div>
             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Kontak</label>
-            <UInput
-              v-model="formKontak"
-              placeholder="e.g. 081234567890"
-              icon="i-heroicons-phone"
-              size="lg"
-              class="w-full"
-            />
+            <UInput v-model="formKontak" placeholder="e.g. 081234567890" icon="i-heroicons-phone" size="lg" class="w-full" />
           </div>
 
           <div>
             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Kode Lokasi</label>
-            <UInput
-              v-model="formKodeLokasi"
-              placeholder="e.g. LOK-001"
-              icon="i-heroicons-map-pin"
-              size="lg"
-              class="w-full"
-            />
+            <UInput v-model="formKodeLokasi" placeholder="e.g. LOK-001" icon="i-heroicons-map-pin" size="lg" class="w-full" />
           </div>
         </div>
       </template>
@@ -495,9 +521,9 @@ watch(user, (newUser) => {
     </UModal>
 
     <!-- Delete Confirmation Modal -->
-    <UModal v-model:open="deleteModalOpen" title="Delete Teknisi" description="This action cannot be undone.">
+    <UModal v-model:open="deleteModalOpen" title="Delete Teknisi" description="This action cannot be undone." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
       <template #body>
-        <div class="space-y-4">
+        <div class="space-y-5">
           <UAlert v-if="deleteError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="deleteError" />
           <div class="flex items-start gap-4 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
             <UIcon name="i-heroicons-exclamation-triangle" class="w-8 h-8 text-red-500 shrink-0 mt-0.5" />
@@ -521,9 +547,9 @@ watch(user, (newUser) => {
     </UModal>
 
     <!-- Deactivate Confirmation Modal -->
-    <UModal v-model:open="deactivateModalOpen" title="Deactivate Teknisi" description="This will remove the technician's access immediately.">
+    <UModal v-model:open="deactivateModalOpen" title="Deactivate Teknisi" description="This will remove the technician's access immediately." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
       <template #body>
-        <div class="space-y-4">
+        <div class="space-y-5">
           <UAlert v-if="deactivateError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="deactivateError" />
           <div class="flex items-start gap-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
             <UIcon name="i-heroicons-exclamation-triangle" class="w-8 h-8 text-amber-500 shrink-0 mt-0.5" />
@@ -545,5 +571,31 @@ watch(user, (newUser) => {
         </div>
       </template>
     </UModal>
-  </div>
+
+    <!-- Activate Confirmation Modal -->
+    <UModal v-model:open="activateModalOpen" title="Activate Teknisi" description="This will restore the technician's access." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
+      <template #body>
+        <div class="space-y-5">
+          <UAlert v-if="activateError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="activateError" />
+          <div class="flex items-start gap-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+            <UIcon name="i-heroicons-check-circle" class="w-8 h-8 text-emerald-500 shrink-0 mt-0.5" />
+            <div>
+              <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                Are you sure you want to activate "{{ activateRecordLabel }}"?
+              </p>
+              <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                This will restore their access to the application.
+              </p>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <UButton label="Cancel" color="neutral" variant="soft" @click="activateModalOpen = false" :disabled="activateLoading" />
+          <UButton label="Activate" color="success" icon="i-heroicons-user-plus" @click="activateTeknisi" :loading="activateLoading" :disabled="activateLoading" />
+        </div>
+      </template>
+    </UModal>
+  </main>
 </template>

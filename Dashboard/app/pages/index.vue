@@ -6,6 +6,8 @@ const user = useSupabaseUser()
 const maintenanceRecords = ref([])
 const errorMsg = ref(null)
 const loading = ref(false)
+// FIX 2: Track total record count from server for correct pagination
+const totalCount = ref(0)
 
 // Detail Modal state
 const detailModalOpen = ref(false)
@@ -40,10 +42,11 @@ const formTanggalMaintenance = ref('')
 const formStatus = ref(false)
 const formDevices = ref([])
 
-// Dropdown options (fetched from DB)
+// FIX 4: Dropdown options — cached after first load, never re-fetched unnecessarily
 const teknisiList = ref([])
 const clientList = ref([])
 const kategoriPerangkatList = ref([])
+const dropdownDataLoaded = ref(false)
 
 // Sorting state: null = no sort, 'asc', 'desc'
 const statusSort = ref(null)
@@ -52,59 +55,27 @@ const dateSort = ref(null)
 // Pagination state
 const PAGE_SIZE = 10
 const currentPage = ref(1)
+const searchQuery = useState('search-query', () => '')
 
+// FIX 3: Sort toggles now trigger a server-side re-fetch instead of client-side sort
 function toggleStatusSort() {
-  // Cycle: null -> asc (pending first) -> desc (completed first) -> null
   if (statusSort.value === null) statusSort.value = 'asc'
   else if (statusSort.value === 'asc') statusSort.value = 'desc'
   else statusSort.value = null
   currentPage.value = 1
+  getMaintenanceData()
 }
 
 function toggleDateSort() {
-  // Cycle: null -> desc (newest first) -> asc (oldest first) -> null
   if (dateSort.value === null) dateSort.value = 'desc'
   else if (dateSort.value === 'desc') dateSort.value = 'asc'
   else dateSort.value = null
   currentPage.value = 1
+  getMaintenanceData()
 }
 
-function sortIcon(direction) {
-  if (direction === 'asc') return 'i-heroicons-bars-arrow-up'
-  if (direction === 'desc') return 'i-heroicons-bars-arrow-down'
-  return 'i-heroicons-arrows-up-down'
-}
-
-const sortedRecords = computed(() => {
-  let records = [...maintenanceRecords.value]
-
-  // Apply status sort
-  if (statusSort.value) {
-    records.sort((a, b) => {
-      const aVal = a.status ? 1 : 0
-      const bVal = b.status ? 1 : 0
-      return statusSort.value === 'asc' ? aVal - bVal : bVal - aVal
-    })
-  }
-
-  // Apply date sort (overrides status sort if both active — last applied wins as secondary)
-  if (dateSort.value) {
-    records.sort((a, b) => {
-      const aDate = a.tanggal_maintenance ? new Date(a.tanggal_maintenance).getTime() : 0
-      const bDate = b.tanggal_maintenance ? new Date(b.tanggal_maintenance).getTime() : 0
-      return dateSort.value === 'desc' ? bDate - aDate : aDate - bDate
-    })
-  }
-
-  return records
-})
-
-const totalPages = computed(() => Math.max(1, Math.ceil(sortedRecords.value.length / PAGE_SIZE)))
-
-const paginatedRecords = computed(() => {
-  const start = (currentPage.value - 1) * PAGE_SIZE
-  return sortedRecords.value.slice(start, start + PAGE_SIZE)
-})
+// FIX 2: totalPages now driven by server-returned count, not local array length
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / PAGE_SIZE)))
 
 const columns = [
   { accessorKey: 'id', header: 'ID' },
@@ -124,21 +95,65 @@ async function getMaintenanceData() {
   loading.value = true;
   errorMsg.value = null;
   try {
-    // Use Supabase foreign key joins to fetch related teknisi, client, and maintenance_detail data
-    const { data, error } = await supabase
+    const q = searchQuery.value?.trim().toLowerCase()
+    const hasSearch = !!q
+
+    let query = supabase
       .from('maintenance')
-      .select('*, teknisi(*), client(*), maintenance_detail(*, kategori_perangkat(*))')
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    maintenanceRecords.value = data || []
+      .select(`
+        id, created_at, status, kode_lokasi, tanggal_maintenance,
+        teknisi:teknisi_id(id, nama, kontak, users(is_active)),
+        client:client_id(id, nama, kontak),
+        maintenance_detail(id, catatan_kerusakan, kategori_perangkat:kategori_perangkat_id(id, kategori, nama_perangkat))
+      `, hasSearch ? {} : { count: 'exact' })
+
+    if (!hasSearch) {
+      const from = (currentPage.value - 1) * PAGE_SIZE
+      const to = from + PAGE_SIZE - 1
+      query = query.range(from, to)
+    }
+
+    if (statusSort.value) {
+      query = query.order('status', { ascending: statusSort.value === 'asc' })
+    }
+    if (dateSort.value) {
+      query = query.order('created_at', { ascending: dateSort.value === 'asc' })
+    } else {
+      query = query.order('created_at', { ascending: false })
+    }
+
+    const { data, error, count } = await query
+    if (error) {
+      console.error('[getMaintenanceData] Supabase error:', error)
+      throw error
+    }
+
+    if (hasSearch) {
+      const allFiltered = (data || []).filter(record => {
+        const orderIdMatches = String(record.id).toLowerCase().includes(q)
+        const kodeLokasiMatches = record.kode_lokasi ? String(record.kode_lokasi).toLowerCase().includes(q) : false
+        const teknisiMatches = record.teknisi?.nama ? String(record.teknisi.nama).toLowerCase().includes(q) : false
+        const clientMatches = record.client?.nama ? String(record.client.nama).toLowerCase().includes(q) : false
+        return orderIdMatches || kodeLokasiMatches || teknisiMatches || clientMatches
+      })
+      totalCount.value = allFiltered.length
+      const start = (currentPage.value - 1) * PAGE_SIZE
+      maintenanceRecords.value = allFiltered.slice(start, start + PAGE_SIZE)
+    } else {
+      maintenanceRecords.value = data || []
+      totalCount.value = count || 0
+    }
   } catch (error) {
+    console.error('[getMaintenanceData] catch:', error)
     errorMsg.value = error.message
   } finally {
     loading.value = false;
   }
 }
 
+// FIX 4: Dropdown data cached — only fetches once per session
 async function fetchDropdownData() {
+  if (dropdownDataLoaded.value) return
   try {
     const [teknisiRes, clientRes, kategoriRes] = await Promise.all([
       supabase.from('teknisi').select('id, nama'),
@@ -152,6 +167,7 @@ async function fetchDropdownData() {
     teknisiList.value = teknisiRes.data || []
     clientList.value = clientRes.data || []
     kategoriPerangkatList.value = kategoriRes.data || []
+    dropdownDataLoaded.value = true
   } catch (error) {
     errorMsg.value = error.message
   }
@@ -168,7 +184,7 @@ function openInsertModal() {
   insertError.value = null
   insertSuccess.value = false
   insertModalOpen.value = true
-  fetchDropdownData()
+  fetchDropdownData()  // Uses cache after first load — no extra network call
 }
 
 async function insertMaintenance() {
@@ -185,8 +201,8 @@ async function insertMaintenance() {
     const { data: newRecord, error } = await supabase
       .from('maintenance')
       .insert({
-        teknisi: formTeknisi.value,
-        client: formClient.value,
+        teknisi_id: formTeknisi.value,
+        client_id: formClient.value,
         kode_lokasi: formKodeLokasi.value.trim(),
         tanggal_maintenance: formTanggalMaintenance.value
       })
@@ -209,7 +225,10 @@ async function insertMaintenance() {
     }
 
     insertSuccess.value = true
-    await getMaintenanceData()
+    // Go to page 1 so the user sees the new record (ordered by created_at desc)
+    currentPage.value = 1
+    // Re-fetch is now fast: only loads 10 rows with minimal columns
+    await Promise.all([getMaintenanceData(), fetchStats()])
     setTimeout(() => {
       insertModalOpen.value = false
     }, 800)
@@ -223,8 +242,8 @@ async function insertMaintenance() {
 // ── EDIT ────────────────────────────────────
 function openEditModal(record) {
   editRecordId.value = record.id
-  formTeknisi.value = record.teknisi && typeof record.teknisi === 'object' ? record.teknisi.id : record.teknisi
-  formClient.value = record.client && typeof record.client === 'object' ? record.client.id : record.client
+  formTeknisi.value = record.teknisi && typeof record.teknisi === 'object' ? record.teknisi.id : (record.teknisi_id || record.teknisi)
+  formClient.value = record.client && typeof record.client === 'object' ? record.client.id : (record.client_id || record.client)
   formKodeLokasi.value = record.kode_lokasi || ''
   formTanggalMaintenance.value = record.tanggal_maintenance || ''
   formStatus.value = !!record.status
@@ -237,7 +256,7 @@ function openEditModal(record) {
   editError.value = null
   editSuccess.value = false
   editModalOpen.value = true
-  fetchDropdownData()
+  fetchDropdownData()  // Uses cache after first load — no extra network call
 }
 
 async function updateMaintenance() {
@@ -254,8 +273,8 @@ async function updateMaintenance() {
     const { error } = await supabase
       .from('maintenance')
       .update({
-        teknisi: formTeknisi.value,
-        client: formClient.value,
+        teknisi_id: formTeknisi.value,
+        client_id: formClient.value,
         kode_lokasi: formKodeLokasi.value.trim(),
         tanggal_maintenance: formTanggalMaintenance.value,
         status: formStatus.value
@@ -285,7 +304,8 @@ async function updateMaintenance() {
     }
 
     editSuccess.value = true
-    await getMaintenanceData()
+    // Re-fetch is now fast: only loads current page's 10 rows
+    await Promise.all([getMaintenanceData(), fetchStats()])
     setTimeout(() => {
       editModalOpen.value = false
     }, 800)
@@ -315,7 +335,8 @@ async function deleteMaintenance() {
       .eq('id', deleteRecordId.value)
     if (error) throw error
 
-    await getMaintenanceData()
+    // Re-fetch is now fast: only loads current page's 10 rows
+    await Promise.all([getMaintenanceData(), fetchStats()])
     deleteModalOpen.value = false
   } catch (error) {
     deleteError.value = error.message
@@ -355,9 +376,18 @@ function showDetail(type, data) {
 }
 
 function formatLabel(key) {
+  if (key === 'users') return 'Status'
   return key
     .replace(/_/g, ' ')
     .replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function getIconForKey(key) {
+  if (key === 'id') return 'i-heroicons-fingerprint'
+  if (key === 'nama') return 'i-heroicons-user'
+  if (key === 'kontak') return 'i-heroicons-phone'
+  if (key === 'users') return 'i-heroicons-shield-check'
+  return 'i-heroicons-information-circle'
 }
 
 // Format Indonesian phone number to WhatsApp URL
@@ -374,208 +404,298 @@ function openWhatsApp(kontak) {
   window.open(`https://wa.me/${phone}`, '_blank')
 }
 
+const totalTeknisiCount = ref(0)
+const activeTeknisiCount = ref(0)
+// FIX: Accurate whole-dataset counts via server count queries, not local array
+const pendingTasksCount = ref(0)
+const completedTasksCount = ref(0)
+
+async function fetchStats() {
+  const [teknisiRes, pendingRes, completedRes] = await Promise.all([
+    supabase.from('teknisi').select('id, users(is_active)'),
+    supabase.from('maintenance').select('id', { count: 'exact', head: true }).eq('status', false),
+    supabase.from('maintenance').select('id', { count: 'exact', head: true }).eq('status', true),
+  ])
+  if (!teknisiRes.error && teknisiRes.data) {
+    totalTeknisiCount.value = teknisiRes.data.length
+    activeTeknisiCount.value = teknisiRes.data.filter(t => t.users?.is_active).length
+  }
+  if (!pendingRes.error) pendingTasksCount.value = pendingRes.count || 0
+  if (!completedRes.error) completedTasksCount.value = completedRes.count || 0
+}
+
 async function logout() {
   await supabase.auth.signOut()
 }
 
 onMounted(() => {
   if (user.value) {
+    // FIX 5: Run both fetch calls in parallel — cuts sequential wait time in half
+    Promise.all([getMaintenanceData(), fetchStats()])
+  }
+})
+
+// FIX 2: Re-fetch on page navigation (server-side pagination)
+watch(currentPage, () => {
+  getMaintenanceData()
+})
+
+watch(searchQuery, () => {
+  if (currentPage.value === 1) {
     getMaintenanceData()
+  } else {
+    currentPage.value = 1
   }
 })
 
 // Refetch data when user logs in successfully
 watch(user, (newUser) => {
   if (newUser) {
-    getMaintenanceData()
+    Promise.all([getMaintenanceData(), fetchStats()])
   } else {
     maintenanceRecords.value = []
+    totalCount.value = 0
+    pendingTasksCount.value = 0
+    completedTasksCount.value = 0
   }
 })
 </script>
 
 <template>
-  <div class="h-full bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
-    <UContainer class="py-6 sm:py-8 lg:py-12 flex flex-col items-center">
-      <div class="w-full max-w-5xl flex flex-col md:flex-row justify-between items-start md:items-center mb-6 sm:mb-8 gap-4">
-        <h1 class="text-2xl sm:text-3xl font-extrabold">
-          Maintenance Dashboard
-        </h1>
-        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-          <template v-if="!user">
-            <UButton to="/login" color="primary" variant="solid" size="lg" icon="i-heroicons-arrow-right-on-rectangle">
-              Login to View Data
-            </UButton>
-          </template>
-          <template v-else>
-            <UButton @click="openInsertModal" color="primary" variant="solid" size="lg" icon="i-heroicons-plus-circle">
-              Add Record
-            </UButton>
-            <UButton @click="logout" color="neutral" variant="soft" size="lg" icon="i-heroicons-arrow-left-on-rectangle">
-              Logout ({{ user.email }})
-            </UButton>
-          </template>
+  <main class="flex-1 p-lg max-w-container-max mx-auto w-full bg-background font-body-md text-on-surface h-full">
+    <!-- Dashboard Header Section -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-xl gap-md mt-6">
+      <div>
+        <h1 class="font-display text-display text-on-surface">Maintenance Dashboard</h1>
+        <p class="text-secondary font-body-md mt-1">Real-time overview of current service requests and technical operations.</p>
+      </div>
+      <div class="flex items-center gap-sm">
+        <template v-if="!user">
+          <UButton to="/login" color="primary" variant="solid" size="lg" icon="i-heroicons-arrow-right-on-rectangle">
+            Login to View Data
+          </UButton>
+        </template>
+        <template v-else>
+          <button @click="openInsertModal" class="flex items-center gap-sm px-lg py-sm bg-primary-container text-white rounded-lg font-label-bold hover:brightness-105 transition-all shadow-sm active:scale-95">
+            <span class="material-symbols-outlined text-[20px]">add</span>
+            <span class="">Add Record</span>
+          </button>
+        </template>
+      </div>
+    </div>
+    
+    <UAlert v-if="errorMsg" icon="i-heroicons-exclamation-triangle" color="red" variant="soft" :title="errorMsg" class="w-full mb-8" />
+    
+    <div v-if="!user" class="py-12 flex flex-col items-center justify-center text-secondary">
+      <span class="material-symbols-outlined text-[48px] mb-4 opacity-50">lock</span>
+      <p class="text-lg font-medium mb-3 text-on-surface">Access Restricted</p>
+      <p class="text-sm mb-6">Please log in to view the maintenance records.</p>
+      <UButton to="/login" color="primary">Go to Login</UButton>
+    </div>
+    
+    <template v-else>
+      <!-- Dashboard Stats Grid (Bento Style) -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-lg mb-xl">
+        <div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
+          <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-[#EAB308]"></div>
+          <p class="text-secondary font-label-bold mb-base uppercase tracking-wider text-[10px]">Pending Task</p>
+          <div class="flex items-end gap-sm">
+            <h3 class="text-3xl font-display font-bold text-on-surface">{{ pendingTasksCount }}</h3>
+          </div>
+          <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-7xl text-[#EAB308]/10 group-hover:text-[#EAB308]/20 transition-colors">pending_actions</span>
+        </div>
+        <div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
+          <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-primary"></div>
+          <p class="text-secondary font-label-bold mb-base uppercase tracking-wider text-[10px]">Completed Task</p>
+          <div class="flex items-end gap-sm">
+            <h3 class="text-3xl font-display font-bold text-on-surface">{{ completedTasksCount }}</h3>
+          </div>
+          <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-7xl text-primary/10 group-hover:text-primary/20 transition-colors">assignment_turned_in</span>
+        </div>
+        <div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
+          <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-secondary"></div>
+          <p class="text-secondary font-label-bold mb-base uppercase tracking-wider text-[10px]">Teknisi Aktif</p>
+          <div class="flex items-end gap-sm">
+            <h3 class="text-3xl font-display font-bold text-on-surface">{{ activeTeknisiCount }}</h3>
+          </div>
+          <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-7xl text-secondary/10 group-hover:text-secondary/20 transition-colors">engineering</span>
+        </div>
+        <div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
+          <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-primary-container"></div>
+          <p class="text-secondary font-label-bold mb-base uppercase tracking-wider text-[10px]">TOTAL Teknisi</p>
+          <div class="flex items-end gap-sm">
+            <h3 class="text-3xl font-display font-bold text-on-surface">{{ totalTeknisiCount }}</h3>
+          </div>
+          <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-7xl text-primary-container/10 group-hover:text-primary-container/20 transition-colors">badge</span>
         </div>
       </div>
-      
-      <UAlert v-if="errorMsg" icon="i-heroicons-exclamation-triangle" color="red" variant="soft" :title="errorMsg" class="w-full max-w-5xl mb-8" />
-      
-      <UCard class="w-full max-w-5xl shadow-xl ring-1 ring-gray-200 dark:ring-gray-800" :ui="{ rounded: 'rounded-2xl' }">
-        <div v-if="!user" class="flex flex-col items-center justify-center min-h-[400px] text-gray-500 dark:text-gray-400">
-          <UIcon name="i-heroicons-lock-closed" class="w-20 h-20 mb-6 opacity-70 text-primary-500" />
-          <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-3">Access Restricted</h2>
-          <p class="text-lg">Please log in to view the maintenance records.</p>
-          <UButton to="/login" color="primary" size="lg" class="mt-6">
-            Go to Login
-          </UButton>
-        </div>
-        
-        <div v-else class="w-full overflow-x-auto pb-4">
-          <UTable 
-            :data="paginatedRecords" 
-            :columns="columns" 
-            :loading="loading"
-            class="w-full min-w-[900px]"
-          >
-            <template #status-header>
-              <button
-                @click="toggleStatusSort"
-                class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider hover:text-primary-500 dark:hover:text-primary-400 transition-colors duration-150 cursor-pointer select-none"
-              >
-                Status
-                <UIcon :name="sortIcon(statusSort)" class="w-4 h-4" />
-              </button>
-            </template>
-            <template #tanggal_maintenance-header>
-              <button
-                @click="toggleDateSort"
-                class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider hover:text-primary-500 dark:hover:text-primary-400 transition-colors duration-150 cursor-pointer select-none"
-              >
-                Tanggal Maintenance
-                <UIcon :name="sortIcon(dateSort)" class="w-4 h-4" />
-              </button>
-            </template>
-            <template #empty>
-              <div class="py-12 text-center text-gray-500">
-                <UIcon name="i-heroicons-circle-stack-solid" class="w-12 h-12 mb-4 mx-auto" />
-                <p>No Data Found.</p>
-              </div>
-            </template>
-            <template #id-cell="{ row }">
-               <span class="font-mono text-gray-500 dark:text-gray-400">#{{ row.original.id }}</span>
-            </template>
-            <template #created_at-cell="{ row }">
-              <span class="text-sm">{{ row.original.created_at ? new Date(row.original.created_at).toLocaleString() : 'N/A' }}</span>
-            </template>
-            <template #status-cell="{ row }">
-              <UBadge :color="row.original.status ? 'success' : 'warning'" variant="subtle" size="md">
-                {{ row.original.status ? 'Completed' : 'Pending' }}
-              </UBadge>
-            </template>
-            <template #teknisi-cell="{ row }">
-              <button
-                v-if="row.original.teknisi && typeof row.original.teknisi === 'object'"
-                @click="showDetail('teknisi', row.original.teknisi)"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-semibold text-sm text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors duration-150 cursor-pointer border border-primary-200 dark:border-primary-800"
-              >
-                <UIcon name="i-heroicons-wrench-screwdriver" class="w-4 h-4" />
-                {{ row.original.teknisi.nama }}
-              </button>
-              <span v-else class="text-gray-400">-</span>
-            </template>
-            <template #client-cell="{ row }">
-              <button
-                v-if="row.original.client && typeof row.original.client === 'object'"
-                @click="showDetail('client', row.original.client)"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-semibold text-sm text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors duration-150 cursor-pointer border border-emerald-200 dark:border-emerald-800"
-              >
-                <UIcon name="i-heroicons-building-office" class="w-4 h-4" />
-                {{ row.original.client.nama }}
-              </button>
-              <span v-else class="text-gray-400">-</span>
-            </template>
-            <template #devices-cell="{ row }">
-              <div class="flex flex-col gap-1 max-w-[220px]">
-                <div 
-                  v-for="detail in row.original.maintenance_detail" 
-                  :key="detail.id"
-                  class="text-xs flex flex-col gap-0.5 border-b border-gray-100 dark:border-gray-800 last:border-0 pb-1 last:pb-0"
-                >
-                  <span class="font-semibold text-gray-800 dark:text-gray-200">
-                    {{ detail.kategori_perangkat?.kategori }} - {{ detail.kategori_perangkat?.nama_perangkat }}
-                  </span>
-                  <span class="text-gray-500 dark:text-gray-400 italic text-[11px]" v-if="detail.catatan_kerusakan">
-                    "{{ detail.catatan_kerusakan }}"
-                  </span>
-                </div>
-                <span v-if="!row.original.maintenance_detail || row.original.maintenance_detail.length === 0" class="text-gray-450 dark:text-gray-500 text-xs italic">
-                  Tidak ada perangkat
-                </span>
-              </div>
-            </template>
-            <template #kode_lokasi-cell="{ row }">
-               <span class="font-bold text-gray-900 dark:text-white">{{ row.original.kode_lokasi || '-' }}</span>
-            </template>
-            <template #tanggal_maintenance-cell="{ row }">
-               <span class="text-sm text-gray-700 dark:text-gray-300">
-                 {{ row.original.tanggal_maintenance ? new Date(row.original.tanggal_maintenance).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-' }}
-               </span>
-            </template>
-            <template #actions-cell="{ row }">
-              <div class="flex items-center gap-2">
-                <UButton
-                  size="xs"
-                  color="primary"
-                  variant="soft"
-                  icon="i-heroicons-pencil-square"
-                  @click="openEditModal(row.original)"
-                >
-                  Edit
-                </UButton>
-                <UButton
-                  size="xs"
-                  color="error"
-                  variant="soft"
-                  icon="i-heroicons-trash"
-                  @click="openDeleteModal(row.original)"
-                >
-                  Delete
-                </UButton>
-              </div>
-            </template>
-          </UTable>
 
-          <!-- Pagination -->
-          <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-4 border-t border-gray-200 dark:border-gray-800">
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              Showing {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, sortedRecords.length) }} of {{ sortedRecords.length }} records
-            </p>
-            <UPagination
-              v-model:page="currentPage"
-              :total="sortedRecords.length"
-              :items-per-page="PAGE_SIZE"
-              show-edges
-            />
-          </div>
+      <!-- Table Section -->
+      <div class="bg-surface-container-lowest rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant overflow-hidden mb-xl">
+        <div class="px-lg py-md border-b border-surface-variant flex items-center justify-between">
+          <h3 class="font-headline-md text-on-surface text-[18px]">Recent Activity</h3>
         </div>
-      </UCard>
-    </UContainer>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse min-w-[1000px]">
+            <thead>
+              <tr class="bg-surface-container-low">
+                <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">ID</th>
+                <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant flex items-center gap-xs cursor-pointer select-none hover:text-primary transition-colors" @click="toggleDateSort">
+                  Created At <span class="material-symbols-outlined text-[12px]">{{ dateSort === 'asc' ? 'arrow_upward' : dateSort === 'desc' ? 'arrow_downward' : 'swap_vert' }}</span>
+                </th>
+                <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant cursor-pointer select-none hover:text-primary transition-colors" @click="toggleStatusSort">
+                  <div class="flex items-center gap-xs">
+                    Status <span class="material-symbols-outlined text-[12px]">{{ statusSort === 'asc' ? 'arrow_upward' : statusSort === 'desc' ? 'arrow_downward' : 'swap_vert' }}</span>
+                  </div>
+                </th>
+                <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Teknisi</th>
+                <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Client</th>
+                <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Perangkat</th>
+                <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Kode Lokasi</th>
+                <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Tgl. Maintenance</th>
+                <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-surface-variant">
+              <tr v-if="loading" class="bg-surface-container-lowest">
+                <td colspan="9" class="px-lg py-xl text-center text-secondary">Loading...</td>
+              </tr>
+              <tr v-else-if="maintenanceRecords.length === 0" class="bg-surface-container-lowest">
+                <td colspan="9" class="px-lg py-xl text-center text-secondary">No Data Found.</td>
+              </tr>
+              <tr v-else v-for="record in maintenanceRecords" :key="record.id" class="hover:bg-surface-container-low/30 transition-colors group">
+                <td class="px-lg py-md font-label-bold text-on-surface">#{{ record.id ?? '-' }}</td>
+                <td class="px-lg py-md text-secondary text-sm">{{ record.created_at ? new Date(record.created_at).toLocaleString() : 'N/A' }}</td>
+                <td class="px-lg py-md">
+                  <span v-if="record.status" class="inline-flex items-center px-sm py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-label-bold border border-emerald-200 uppercase tracking-tighter">
+                    <span class="w-1 h-1 rounded-full bg-emerald-500 mr-1.5"></span>
+                    Completed
+                  </span>
+                  <span v-else class="inline-flex items-center px-sm py-1 rounded-full bg-amber-50 text-amber-700 text-[10px] font-label-bold border border-amber-200 uppercase tracking-tighter">
+                    <span class="w-1 h-1 rounded-full bg-amber-500 mr-1.5"></span>
+                    Pending
+                  </span>
+                </td>
+                <td class="px-lg py-md">
+                  <button
+                    v-if="record.teknisi && typeof record.teknisi === 'object'"
+                    @click="showDetail('teknisi', record.teknisi)"
+                    class="flex items-center gap-sm px-2 py-1 rounded-lg border w-fit transition-colors"
+                    :class="record.teknisi.users?.is_active !== false 
+                      ? 'bg-primary/5 border-primary/10 hover:bg-primary/10 text-primary' 
+                      : 'bg-amber-500/5 border-amber-500/10 hover:bg-amber-500/10 text-amber-600 dark:text-amber-500'"
+                  >
+                    <span 
+                      class="material-symbols-outlined text-[16px]"
+                      :class="record.teknisi.users?.is_active !== false ? 'text-primary' : 'text-amber-600 dark:text-amber-500'"
+                    >
+                      engineering
+                    </span>
+                    <span class="font-medium text-sm">{{ record.teknisi.nama }}</span>
+                  </button>
+                  <span v-else class="text-secondary">-</span>
+                </td>
+                <td class="px-lg py-md">
+                  <button
+                    v-if="record.client && typeof record.client === 'object'"
+                    @click="showDetail('client', record.client)"
+                    class="flex items-center gap-sm px-2 py-1 bg-secondary-container/30 rounded-lg border border-secondary-container/50 w-fit hover:bg-secondary-container/50 transition-colors"
+                  >
+                    <span class="material-symbols-outlined text-[16px] text-secondary">business</span>
+                    <span class="font-medium text-sm text-on-secondary-container">{{ record.client.nama }}</span>
+                  </button>
+                  <span v-else class="text-secondary">-</span>
+                </td>
+                <td class="px-lg py-md">
+                  <div class="flex flex-col gap-1">
+                    <div 
+                      v-for="detail in record.maintenance_detail" 
+                      :key="detail.id"
+                      class="text-sm flex flex-col"
+                    >
+                      <span class="font-medium text-on-surface">
+                        {{ detail.kategori_perangkat?.kategori }} - {{ detail.kategori_perangkat?.nama_perangkat }}
+                      </span>
+                      <span class="text-[11px] text-secondary italic" v-if="detail.catatan_kerusakan">
+                        "{{ detail.catatan_kerusakan }}"
+                      </span>
+                    </div>
+                    <span v-if="!record.maintenance_detail || record.maintenance_detail.length === 0" class="text-secondary text-[11px] italic">
+                      Tidak ada perangkat
+                    </span>
+                  </div>
+                </td>
+                <td class="px-lg py-md font-bold text-on-surface text-sm">{{ record.kode_lokasi || '-' }}</td>
+                <td class="px-lg py-md text-secondary text-sm">
+                  {{ record.tanggal_maintenance ? new Date(record.tanggal_maintenance).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' }}
+                </td>
+                <td class="px-lg py-md text-right">
+                  <div class="flex items-center justify-end gap-2">
+                    <UButton
+                      size="xs"
+                      color="primary"
+                      variant="soft"
+                      icon="i-heroicons-pencil-square"
+                      @click="openEditModal(record)"
+                    >
+                      Edit
+                    </UButton>
+                    <UButton
+                      size="xs"
+                      color="error"
+                      variant="soft"
+                      icon="i-heroicons-trash"
+                      @click="openDeleteModal(record)"
+                    >
+                      Delete
+                    </UButton>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Pagination Footer -->
+        <div v-if="totalPages > 1" class="px-lg py-md bg-surface-container-low border-t border-surface-variant flex items-center justify-between">
+          <p class="text-[11px] text-secondary font-label-md">
+            Showing {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, totalCount) }} of {{ totalCount }} records
+          </p>
+          <UPagination
+            v-model:page="currentPage"
+            :total="totalCount"
+            :items-per-page="PAGE_SIZE"
+            show-edges
+          />
+        </div>
+      </div>
+    </template>
 
     <!-- Detail Modal for Teknisi / Client -->
-    <UModal v-model:open="detailModalOpen" :title="detailModalTitle" :description="'Full record details'">
+    <UModal v-model:open="detailModalOpen" :title="detailModalTitle" :description="'Full record details'" :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
       <template #body>
-        <div v-if="detailModalData" class="space-y-3">
-          <div 
-            v-for="(value, key) in detailModalData" 
-            :key="key"
-            class="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 py-2.5 border-b border-gray-100 dark:border-gray-800 last:border-0"
-          >
-            <span class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 sm:w-36 shrink-0">
+        <div v-if="detailModalData" class="space-y-4">
+          <div v-for="(value, key) in detailModalData" :key="key" class="space-y-1.5">
+            <span class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
               {{ formatLabel(String(key)) }}
             </span>
-            <span class="text-sm text-gray-900 dark:text-white break-all font-mono">
-              {{ value ?? '-' }}
-            </span>
+            <div class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-150 dark:border-gray-800">
+              <UIcon :name="getIconForKey(key)" class="w-5 h-5 text-gray-400 dark:text-gray-500 shrink-0" />
+              <span class="text-sm text-gray-900 dark:text-white break-all font-mono font-medium">
+                <template v-if="key === 'users'">
+                  <span v-if="value?.is_active" class="inline-flex items-center px-sm py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-label-bold border border-emerald-200 uppercase tracking-tighter">
+                    <span class="w-1 h-1 rounded-full bg-emerald-500 mr-1.5"></span>
+                    Active
+                  </span>
+                  <span v-else class="inline-flex items-center px-sm py-1 rounded-full bg-amber-50 text-amber-700 text-[10px] font-label-bold border border-amber-200 uppercase tracking-tighter">
+                    <span class="w-1 h-1 rounded-full bg-amber-500 mr-1.5"></span>
+                    Inactive
+                  </span>
+                </template>
+                <template v-else>
+                  {{ value ?? '-' }}
+                </template>
+              </span>
+            </div>
           </div>
         </div>
       </template>
@@ -584,9 +704,9 @@ watch(user, (newUser) => {
           <UButton
             v-if="detailModalData && detailModalData.kontak"
             label="WhatsApp"
-            color="success"
-            variant="solid"
-            icon="i-heroicons-chat-bubble-left-ellipsis"
+            color="primary"
+            variant="soft"
+            icon="i-heroicons-chat-bubble-oval-left-ellipsis"
             @click="openWhatsApp(detailModalData.kontak)"
           />
           <div v-else />
@@ -596,7 +716,7 @@ watch(user, (newUser) => {
     </UModal>
 
     <!-- Insert Maintenance Record Modal -->
-    <UModal v-model:open="insertModalOpen" title="Add Maintenance Record" description="Fill in the details to create a new maintenance record.">
+    <UModal v-model:open="insertModalOpen" title="Add Maintenance Record" description="Fill in the details to create a new maintenance record." :ui="{ content: 'sm:max-w-3xl w-full', width: 'sm:max-w-3xl w-full' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="insertError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="insertError" />
@@ -707,7 +827,7 @@ watch(user, (newUser) => {
     </UModal>
 
     <!-- Edit Maintenance Record Modal -->
-    <UModal v-model:open="editModalOpen" title="Edit Maintenance Record" description="Update the maintenance record details.">
+    <UModal v-model:open="editModalOpen" title="Edit Maintenance Record" description="Update the maintenance record details." :ui="{ content: 'sm:max-w-3xl w-full', width: 'sm:max-w-3xl w-full' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="editError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="editError" />
@@ -755,6 +875,14 @@ watch(user, (newUser) => {
               size="lg"
               class="w-full"
             />
+          </div>
+
+          <div class="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30">
+            <div>
+              <p class="text-sm font-semibold text-gray-900 dark:text-white">Status Penyelesaian</p>
+              <p class="text-xs text-gray-500">Tandai jika tugas ini sudah selesai.</p>
+            </div>
+            <UToggle v-model="formStatus" size="lg" color="success" />
           </div>
 
           <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
@@ -807,14 +935,6 @@ watch(user, (newUser) => {
               </div>
             </div>
           </div>
-
-          <div class="flex items-center gap-3">
-            <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Status</label>
-            <USwitch v-model="formStatus" />
-            <UBadge :color="formStatus ? 'success' : 'warning'" variant="subtle" size="md">
-              {{ formStatus ? 'Completed' : 'Pending' }}
-            </UBadge>
-          </div>
         </div>
       </template>
       <template #footer>
@@ -826,9 +946,9 @@ watch(user, (newUser) => {
     </UModal>
 
     <!-- Delete Confirmation Modal -->
-    <UModal v-model:open="deleteModalOpen" title="Delete Maintenance Record" description="This action cannot be undone.">
+    <UModal v-model:open="deleteModalOpen" title="Delete Record" description="This action cannot be undone." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
       <template #body>
-        <div class="space-y-4">
+        <div class="space-y-5">
           <UAlert v-if="deleteError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="deleteError" />
           <div class="flex items-start gap-4 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
             <UIcon name="i-heroicons-exclamation-triangle" class="w-8 h-8 text-red-500 shrink-0 mt-0.5" />
@@ -837,7 +957,7 @@ watch(user, (newUser) => {
                 Are you sure you want to delete record {{ deleteRecordLabel }}?
               </p>
               <p class="text-xs text-red-600 dark:text-red-400 mt-1">
-                This will permanently remove this maintenance record from the database.
+                This will permanently remove this maintenance task from the database.
               </p>
             </div>
           </div>
@@ -850,5 +970,5 @@ watch(user, (newUser) => {
         </div>
       </template>
     </UModal>
-  </div>
+  </main>
 </template>

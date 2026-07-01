@@ -62,11 +62,26 @@ async function getClientData() {
   }
 }
 
-const totalPages = computed(() => Math.max(1, Math.ceil(clientRecords.value.length / PAGE_SIZE)))
+const searchQuery = useState('search-query', () => '')
+
+const filteredClientRecords = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return clientRecords.value
+  }
+  const q = searchQuery.value.toLowerCase().trim()
+  return clientRecords.value.filter(record => {
+    const namaMatches = record.nama ? record.nama.toLowerCase().includes(q) : false
+    const kodeLokasiMatches = record.kode_lokasi ? record.kode_lokasi.toLowerCase().includes(q) : false
+    const idMatches = record.id ? record.id.toLowerCase().includes(q) : false
+    return namaMatches || kodeLokasiMatches || idMatches
+  })
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredClientRecords.value.length / PAGE_SIZE)))
 
 const paginatedRecords = computed(() => {
   const start = (currentPage.value - 1) * PAGE_SIZE
-  return clientRecords.value.slice(start, start + PAGE_SIZE)
+  return filteredClientRecords.value.slice(start, start + PAGE_SIZE)
 })
 
 // ── INSERT ──────────────────────────────────
@@ -209,26 +224,29 @@ watch(user, (newUser) => {
     clientRecords.value = []
   }
 })
+
+watch(searchQuery, () => {
+  currentPage.value = 1
+})
 </script>
 
 <template>
-  <div class="h-full flex flex-col p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
-    <UContainer class="w-full max-w-5xl">
-      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 sm:mb-8 gap-4">
+  <main class="flex-1 p-lg max-w-container-max mx-auto w-full bg-background font-body-md text-on-surface h-full">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-xl gap-md mt-6">
         <div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold mb-2">Client Data</h1>
-          <p class="text-gray-500 dark:text-gray-400">Manage your clients here.</p>
+          <h1 class="font-display text-display text-on-surface">Client Data</h1>
+          <p class="text-secondary font-body-md mt-1">Manage your clients here.</p>
         </div>
-        <UButton
+      <div class="flex items-center gap-sm">
+        <button
           v-if="user"
           @click="openInsertModal"
-          color="primary"
-          variant="solid"
-          size="lg"
-          icon="i-heroicons-plus-circle"
+          class="flex items-center gap-sm px-lg py-sm bg-primary-container text-on-primary rounded-lg font-label-bold hover:brightness-105 transition-all shadow-sm active:scale-95"
         >
-          Add Client
-        </UButton>
+          <span class="material-symbols-outlined text-[20px]">add</span>
+          <span>Add Client</span>
+        </button>
+      </div>
       </div>
 
       <UAlert v-if="errorMsg" icon="i-heroicons-exclamation-triangle" color="red" variant="soft" :title="errorMsg" class="w-full mb-8" />
@@ -271,8 +289,8 @@ watch(user, (newUser) => {
                 <UButton
                   v-if="row.original.kontak"
                   size="xs"
-                  color="success"
-                  variant="ghost"
+                  color="primary"
+                  variant="soft"
                   icon="i-heroicons-chat-bubble-oval-left-ellipsis"
                   @click="openWhatsApp(row.original.kontak)"
                   title="Message on WhatsApp"
@@ -309,21 +327,20 @@ watch(user, (newUser) => {
           <!-- Pagination -->
           <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-4 border-t border-gray-200 dark:border-gray-800">
             <p class="text-sm text-gray-500 dark:text-gray-400">
-              Showing {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, clientRecords.length) }} of {{ clientRecords.length }} records
+              Showing {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, filteredClientRecords.length) }} of {{ filteredClientRecords.length }} records
             </p>
             <UPagination
               v-model:page="currentPage"
-              :total="clientRecords.length"
+              :total="filteredClientRecords.length"
               :items-per-page="PAGE_SIZE"
               show-edges
             />
           </div>
         </div>
       </UCard>
-    </UContainer>
 
     <!-- Insert Client Modal -->
-    <UModal v-model:open="insertModalOpen" title="Add Client" description="Fill in the details to add a new client.">
+    <UModal v-model:open="insertModalOpen" title="Add Client" description="Fill in the details to add a new client." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="insertError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="insertError" />
@@ -372,7 +389,7 @@ watch(user, (newUser) => {
     </UModal>
 
     <!-- Edit Client Modal -->
-    <UModal v-model:open="editModalOpen" title="Edit Client" description="Update the client details.">
+    <UModal v-model:open="editModalOpen" title="Edit Client" description="Update the client details." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="editError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="editError" />
@@ -421,9 +438,9 @@ watch(user, (newUser) => {
     </UModal>
 
     <!-- Delete Confirmation Modal -->
-    <UModal v-model:open="deleteModalOpen" title="Delete Client" description="This action cannot be undone.">
+    <UModal v-model:open="deleteModalOpen" title="Delete Client" description="This action cannot be undone." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
       <template #body>
-        <div class="space-y-4">
+        <div class="space-y-5">
           <UAlert v-if="deleteError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="deleteError" />
           <div class="flex items-start gap-4 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
             <UIcon name="i-heroicons-exclamation-triangle" class="w-8 h-8 text-red-500 shrink-0 mt-0.5" />
@@ -445,5 +462,5 @@ watch(user, (newUser) => {
         </div>
       </template>
     </UModal>
-  </div>
+  </main>
 </template>
