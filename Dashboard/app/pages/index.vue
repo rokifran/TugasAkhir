@@ -34,6 +34,11 @@ const deleteError = ref(null)
 const deleteRecordId = ref(null)
 const deleteRecordLabel = ref('')
 
+// Evidence Modal state
+const evidenceModalOpen = ref(false)
+const evidenceLoading = ref(false)
+const evidencePhotos = ref([])
+
 // Form fields (shared between insert & edit)
 const formTeknisi = ref(null)
 const formClient = ref(null)
@@ -345,6 +350,33 @@ async function deleteMaintenance() {
   }
 }
 
+async function openEvidenceModal(record) {
+  evidencePhotos.value = []
+  evidenceModalOpen.value = true
+  evidenceLoading.value = true
+
+  try {
+    const detailIds = record.maintenance_detail?.map(d => d.id) || []
+    if (detailIds.length === 0) {
+      evidencePhotos.value = []
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('maintenance_photos')
+      .select('photo_url')
+      .in('maintenance_detail_id', detailIds)
+
+    if (error) throw error
+    evidencePhotos.value = data || []
+  } catch (error) {
+    console.error('[openEvidenceModal] catch:', error)
+    evidencePhotos.value = []
+  } finally {
+    evidenceLoading.value = false
+  }
+}
+
 // Helper methods for devices form
 function addDeviceField() {
   formDevices.value.push({ kategori_perangkat_id: null, catatan_kerusakan: '' })
@@ -649,6 +681,15 @@ watch(user, (newUser) => {
                     >
                       Delete
                     </UButton>
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      variant="soft"
+                      icon="i-heroicons-photo"
+                      @click="openEvidenceModal(record)"
+                    >
+                      lihat bukti
+                    </UButton>
                   </div>
                 </td>
               </tr>
@@ -711,6 +752,34 @@ watch(user, (newUser) => {
           />
           <div v-else />
           <UButton label="Close" color="neutral" variant="soft" @click="detailModalOpen = false" />
+        </div>
+      </template>
+    </UModal>
+
+    <!-- Evidence Modal -->
+    <UModal v-model:open="evidenceModalOpen" title="Bukti Maintenance" description="View all photos related to this maintenance record." :ui="{ content: 'sm:max-w-3xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-3xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
+      <template #body>
+        <div v-if="evidenceLoading" class="flex flex-col items-center justify-center py-12 text-secondary">
+          <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin mb-2" />
+          <p class="text-sm">Loading images...</p>
+        </div>
+        <div v-else-if="evidencePhotos.length === 0" class="flex flex-col items-center justify-center py-12 text-secondary">
+          <UIcon name="i-heroicons-photo" class="w-8 h-8 mb-2 opacity-50" />
+          <p class="text-sm">Tidak ada bukti foto tersedia.</p>
+        </div>
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <div v-for="(photo, index) in evidencePhotos" :key="index" class="aspect-square rounded-xl overflow-hidden border border-surface-variant group relative">
+            <img 
+              :src="photo.photo_url" 
+              class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end w-full">
+          <UButton label="Close" color="neutral" variant="soft" @click="evidenceModalOpen = false" />
         </div>
       </template>
     </UModal>
