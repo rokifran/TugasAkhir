@@ -103,46 +103,48 @@
       </header>
       
       <!-- Mobile Sidebar -->
-      <USlideover v-model="mobileMenuOpen" side="left" class="md:hidden">
-        <div class="flex flex-col h-full bg-surface-container-low dark:bg-[#13161f] text-on-surface">
-           <div class="p-lg flex items-center gap-md border-b border-outline-variant/30">
-            <div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-white">
-              <span class="material-symbols-outlined">engineering</span>
+      <USlideover v-model:open="mobileMenuOpen" side="left" class="md:hidden">
+        <template #content>
+          <div class="flex flex-col h-full w-[260px] bg-surface-container-low dark:bg-[#13161f] text-on-surface border-r border-outline-variant dark:border-[#1e2235]">
+             <div class="p-lg flex items-center gap-md border-b border-outline-variant/30">
+              <div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-white">
+                <span class="material-symbols-outlined">engineering</span>
+              </div>
+              <div>
+                <h2 class="font-headline-md text-[18px] font-bold text-primary">MaintenApp</h2>
+                <p class="text-[10px] font-label-bold text-secondary tracking-widest uppercase">{{ roleState === 'Teknisi' ? 'Portal Teknisi' : 'Admin Central' }}</p>
+              </div>
             </div>
-            <div>
-              <h2 class="font-headline-md text-[18px] font-bold text-primary">MaintenApp</h2>
-              <p class="text-[10px] font-label-bold text-secondary tracking-widest uppercase">{{ roleState === 'Teknisi' ? 'Portal Teknisi' : 'Admin Central' }}</p>
+            <nav class="flex-1 px-md py-md space-y-1">
+              <NuxtLink
+                v-for="link in links"
+                :key="link.to"
+                :to="link.to"
+                @click="mobileMenuOpen = false"
+                class="flex items-center gap-md px-lg py-md transition-all cursor-pointer group"
+                :class="[
+                  route.path === link.to
+                    ? 'bg-secondary-container/50 text-primary border-l-4 border-primary rounded-r-lg'
+                    : 'text-secondary hover:bg-surface-variant/40 rounded-lg active:translate-x-1'
+                ]"
+              >
+                <UIcon :name="link.icon" class="w-5 h-5 transition-transform group-hover:scale-110" />
+                <span :class="[route.path === link.to ? 'font-label-bold' : 'font-body-md']">{{ link.label }}</span>
+              </NuxtLink>
+            </nav>
+            
+            <div class="px-md pb-xl space-y-1 mt-auto">
+              <a class="flex items-center gap-md px-lg py-md text-secondary hover:bg-surface-variant transition-all rounded-lg group" href="#">
+                <span class="material-symbols-outlined transition-transform group-hover:scale-110">help</span>
+                <span class="font-body-md">Help Center</span>
+              </a>
+              <button @click="logout" class="w-full min-h-[44px] flex items-center gap-md px-lg py-md text-error hover:bg-error-container/20 transition-all rounded-lg group">
+                <span class="material-symbols-outlined transition-transform group-hover:scale-110">logout</span>
+                <span class="font-body-md">Logout</span>
+              </button>
             </div>
           </div>
-          <nav class="flex-1 px-md py-md space-y-1">
-            <NuxtLink
-              v-for="link in links"
-              :key="link.to"
-              :to="link.to"
-              @click="mobileMenuOpen = false"
-              class="flex items-center gap-md px-lg py-md transition-all cursor-pointer group"
-              :class="[
-                route.path === link.to
-                  ? 'bg-secondary-container/50 text-primary border-l-4 border-primary rounded-r-lg'
-                  : 'text-secondary hover:bg-surface-variant/40 rounded-lg active:translate-x-1'
-              ]"
-            >
-              <UIcon :name="link.icon" class="w-5 h-5 transition-transform group-hover:scale-110" />
-              <span :class="[route.path === link.to ? 'font-label-bold' : 'font-body-md']">{{ link.label }}</span>
-            </NuxtLink>
-          </nav>
-          
-          <div class="px-md pb-xl space-y-1 mt-auto">
-            <a class="flex items-center gap-md px-lg py-md text-secondary hover:bg-surface-variant transition-all rounded-lg group" href="#">
-              <span class="material-symbols-outlined transition-transform group-hover:scale-110">help</span>
-              <span class="font-body-md">Help Center</span>
-            </a>
-            <button @click="logout" class="w-full min-h-[44px] flex items-center gap-md px-lg py-md text-error hover:bg-error-container/20 transition-all rounded-lg group">
-              <span class="material-symbols-outlined transition-transform group-hover:scale-110">logout</span>
-              <span class="font-body-md">Logout</span>
-            </button>
-          </div>
-        </div>
+        </template>
       </USlideover>
 
       <!-- Main Content -->

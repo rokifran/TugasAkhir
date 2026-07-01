@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 
 definePageMeta({
   layout: false
@@ -12,6 +12,16 @@ const password = ref('')
 const errorMsg = ref(null)
 const loading = ref(false)
 const showPassword = ref(false)
+
+const colorMode = useColorMode()
+const isDark = computed({
+  get () {
+    return colorMode.value === 'dark'
+  },
+  set () {
+    colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
+  }
+})
 
 watch(user, (newUser) => {
   const userId = newUser?.id || newUser?.sub || newUser?.user?.id
@@ -59,7 +69,20 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="flex-grow flex items-center justify-center px-md py-xl relative z-10 min-h-screen bg-surface text-on-background">
+  <main class="flex-grow flex items-center justify-center px-md py-xl relative z-10 min-h-screen bg-surface dark:bg-[#0f111a] text-on-background">
+    <!-- Floating Theme Toggle -->
+    <div class="absolute top-md right-md z-20">
+      <ClientOnly>
+        <UButton
+          :icon="isDark ? 'i-heroicons-moon-20-solid' : 'i-heroicons-sun-20-solid'"
+          color="gray"
+          variant="ghost"
+          aria-label="Theme"
+          @click="isDark = !isDark"
+        />
+      </ClientOnly>
+    </div>
+
     <div class="w-full max-w-[440px] animate-in fade-in slide-in-from-bottom-4 duration-700">
       <!-- Logo Section -->
       <div class="flex justify-center mb-xl">
@@ -71,7 +94,7 @@ onMounted(() => {
         </div>
       </div>
       <!-- Login Card -->
-      <div class="bg-white rounded-2xl login-card-shadow overflow-hidden relative border border-outline-variant">
+      <div class="login-card-shadow overflow-hidden relative shadow-xl rounded-2xl ring-1 ring-gray-200 dark:ring-gray-700 bg-white dark:bg-[#171a28]">
         <div class="status-strip"></div>
         <div class="px-xl py-xl">
           <div class="text-center mb-lg">
@@ -79,66 +102,81 @@ onMounted(() => {
             <p class="font-body-md text-body-md text-on-surface-variant">Silakan masuk ke akun Anda untuk melanjutkan</p>
           </div>
           <div class="flex justify-center mb-lg">
-            <div class="inline-flex items-center gap-xs px-md py-xs bg-surface-container-low rounded-full border border-outline-variant">
+            <div class="inline-flex items-center gap-xs px-md py-xs bg-surface-container-low dark:bg-[#1e2235] rounded-full border border-outline-variant dark:border-[#334155]">
               <span class="material-symbols-outlined text-secondary text-[16px]">info</span>
-              <span class="font-label-md text-label-md text-on-secondary-container">Masuk sebagai Admin atau Teknisi</span>
+              <span class="font-label-md text-label-md text-on-secondary-container dark:text-[#c8d6e8]">Masuk sebagai Admin atau Teknisi</span>
             </div>
           </div>
           <form class="space-y-md" @submit.prevent="handleLogin">
             <!-- Email Input -->
             <div class="space-y-xs">
               <label class="font-label-bold text-label-bold text-on-surface-variant ml-xs" for="email">Email atau Username</label>
-              <div class="relative group">
-                <span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors">person</span>
-                <input class="w-full h-11 pl-[48px] pr-md bg-surface-container-low border-transparent focus:border-primary focus:bg-white focus:ring-0 rounded-lg transition-all duration-200 font-body-md text-on-surface"
-                  id="email"
-                  placeholder="contoh@maintenapp.com"
-                  type="text"
-                  v-model="email"
-                  :disabled="loading"
-                  required />
-              </div>
+              <UInput
+                id="email"
+                v-model="email"
+                type="text"
+                placeholder="contoh@maintenapp.com"
+                icon="i-heroicons-user"
+                size="lg"
+                class="w-full"
+                :ui="{ base: 'bg-surface-container-low dark:bg-[#1e2235] border border-outline-variant dark:border-[#334155] text-on-surface dark:text-[#c8d6e8] placeholder:text-on-surface-variant dark:placeholder:text-[#94a3b8]' }"
+                :disabled="loading"
+                required
+              />
             </div>
             <!-- Password Input -->
             <div class="space-y-xs">
               <div class="flex justify-between items-center px-xs">
                 <label class="font-label-bold text-label-bold text-on-surface-variant" for="password">Kata Sandi</label>
               </div>
-              <div class="relative group">
-                <span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors">lock</span>
-                <input class="w-full h-11 pl-[48px] pr-[48px] bg-surface-container-low border-transparent focus:border-primary focus:bg-white focus:ring-0 rounded-lg transition-all duration-200 font-body-md text-on-surface"
-                  id="password"
-                  placeholder="••••••••"
-                  :type="showPassword ? 'text' : 'password'"
-                  v-model="password"
-                  :disabled="loading"
-                  required />
-                <button type="button"
-                  class="absolute right-md top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors focus:outline-none"
-                  @click="showPassword = !showPassword">
-                  <span class="material-symbols-outlined" id="password-toggle-icon">{{ showPassword ? 'visibility_off' : 'visibility' }}</span>
-                </button>
-              </div>
+              <UInput
+                id="password"
+                v-model="password"
+                placeholder="••••••••"
+                :type="showPassword ? 'text' : 'password'"
+                icon="i-heroicons-lock-closed"
+                size="lg"
+                class="w-full"
+                :ui="{ base: 'bg-surface-container-low dark:bg-[#1e2235] border border-outline-variant dark:border-[#334155] text-on-surface dark:text-[#c8d6e8] placeholder:text-on-surface-variant dark:placeholder:text-[#94a3b8]' }"
+                :disabled="loading"
+                required
+              >
+                <template #trailing>
+                  <UButton
+                    color="neutral"
+                    variant="ghost"
+                    :icon="showPassword ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'"
+                    class="focus:outline-none text-on-surface-variant dark:text-[#94a3b8] hover:text-on-surface dark:hover:text-[#c8d6e8]"
+                    @click="showPassword = !showPassword"
+                  />
+                </template>
+              </UInput>
             </div>
             <!-- Utilities -->
             <div class="flex items-center justify-between pt-xs">
               <label class="flex items-center gap-sm cursor-pointer group">
                 <div class="relative flex items-center">
-                  <input class="peer h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary-container bg-surface-container-low"
+                  <input class="peer h-5 w-5 rounded border-outline-variant dark:border-[#334155] text-primary focus:ring-primary-container bg-surface-container-low dark:bg-[#1e2235] dark:checked:bg-primary"
                     type="checkbox">
                 </div>
                 <span class="font-label-md text-label-md text-on-surface-variant group-hover:text-on-surface transition-colors">Ingat Saya</span>
               </label>
-              <a class="font-label-md text-label-md text-primary font-bold hover:underline" href="#">Lupa Kata Sandi?</a>
             </div>
             <!-- Login Button -->
-            <button class="w-full h-[48px] bg-primary-container text-white font-headline-md text-headline-md rounded-lg hover:opacity-90 active:scale-[0.98] transition-all duration-200 shadow-lg shadow-primary-container/20 mt-md flex items-center justify-center gap-sm"
+            <UButton
               type="submit"
-              :disabled="!email || !password || loading">
-              <span v-if="loading" class="material-symbols-outlined spin-icon">progress_activity</span>
-              <span v-else class="material-symbols-outlined btn-icon">login</span>
+              size="lg"
+              color="primary"
+              :loading="loading"
+              :disabled="!email || !password || loading"
+              class="w-full h-[48px] justify-center mt-md"
+              :ui="{ base: 'bg-primary-container dark:bg-[#006e2f] hover:bg-primary dark:hover:bg-[#4ae176] text-on-primary dark:text-[#003914] font-semibold transition-colors duration-200' }"
+            >
+              <template #leading v-if="!loading">
+                <UIcon name="i-heroicons-arrow-right-end-on-rectangle" class="w-5 h-5" />
+              </template>
               <span>{{ loading ? 'Memproses...' : 'Masuk' }}</span>
-            </button>
+            </UButton>
             <UAlert v-if="errorMsg"
               icon="i-heroicons-exclamation-circle"
               color="error"

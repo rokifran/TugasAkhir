@@ -251,96 +251,97 @@ watch(searchQuery, () => {
 
       <UAlert v-if="errorMsg" icon="i-heroicons-exclamation-triangle" color="red" variant="soft" :title="errorMsg" class="w-full mb-8" />
       
-      <UCard :ui="{ rounded: 'rounded-2xl' }" class="shadow-xl ring-1 ring-gray-200 dark:ring-gray-800">
-        <div v-if="!user" class="py-12 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
-          <UIcon name="i-heroicons-lock-closed" class="w-16 h-16 mb-4 opacity-50" />
-          <p class="text-lg font-medium mb-3">Access Restricted</p>
-          <p class="text-sm mb-6">Please log in to view the client records.</p>
-          <UButton to="/login" color="primary">Go to Login</UButton>
-        </div>
-        
-        <div v-else class="w-full overflow-x-auto">
-          <UTable 
-            :data="paginatedRecords" 
-            :columns="columns" 
-            :loading="loading"
-            class="w-full min-w-[600px]"
-          >
-            <template #empty>
-              <div class="py-12 text-center text-gray-500">
-                <UIcon name="i-heroicons-circle-stack-solid" class="w-12 h-12 mb-4 mx-auto" />
-                <p>No Data Found.</p>
-              </div>
-            </template>
-            <template #id-cell="{ row }">
-               <span class="font-mono text-gray-500 dark:text-gray-400" :title="row.original.id">
-                 {{ row.original.id ? row.original.id.substring(0,8) + '...' : '-' }}
-               </span>
-            </template>
-            <template #created_at-cell="{ row }">
-              <span class="text-sm">{{ row.original.created_at ? new Date(row.original.created_at).toLocaleString() : 'N/A' }}</span>
-            </template>
-            <template #nama-cell="{ row }">
-               <span class="font-bold text-gray-900 dark:text-white">{{ row.original.nama || '-' }}</span>
-            </template>
-            <template #kontak-cell="{ row }">
-              <div class="flex items-center gap-2">
-                <span class="text-gray-700 dark:text-gray-300">{{ row.original.kontak || '-' }}</span>
-                <UButton
-                  v-if="row.original.kontak"
-                  size="xs"
-                  color="primary"
-                  variant="soft"
-                  icon="i-heroicons-chat-bubble-oval-left-ellipsis"
-                  @click="openWhatsApp(row.original.kontak)"
-                  title="Message on WhatsApp"
-                />
-              </div>
-            </template>
-            <template #kode_lokasi-cell="{ row }">
-               <span class="text-gray-900 dark:text-gray-300 font-mono">{{ row.original.kode_lokasi || '-' }}</span>
-            </template>
-            <template #actions-cell="{ row }">
-              <div class="flex items-center gap-2">
-                <UButton
-                  size="xs"
-                  color="primary"
-                  variant="soft"
-                  icon="i-heroicons-pencil-square"
-                  @click="openEditModal(row.original)"
-                >
-                  Edit
-                </UButton>
-                <UButton
-                  size="xs"
-                  color="error"
-                  variant="soft"
-                  icon="i-heroicons-trash"
-                  @click="openDeleteModal(row.original)"
-                >
-                  Delete
-                </UButton>
-              </div>
-            </template>
-          </UTable>
+    <div v-if="!user" class="py-12 flex flex-col items-center justify-center text-secondary">
+      <span class="material-symbols-outlined text-[48px] mb-4 opacity-50">lock</span>
+      <p class="text-lg font-medium mb-3 text-on-surface">Access Restricted</p>
+      <p class="text-sm mb-6">Please log in to view the client records.</p>
+      <UButton to="/login" color="primary">Go to Login</UButton>
+    </div>
 
-          <!-- Pagination -->
-          <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-4 border-t border-gray-200 dark:border-gray-800">
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              Showing {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, filteredClientRecords.length) }} of {{ filteredClientRecords.length }} records
-            </p>
-            <UPagination
-              v-model:page="currentPage"
-              :total="filteredClientRecords.length"
-              :items-per-page="PAGE_SIZE"
-              show-edges
-            />
-          </div>
-        </div>
-      </UCard>
+    <div v-else class="bg-surface-container-lowest rounded-2xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant overflow-hidden mb-xl">
+      <div class="px-lg py-md border-b border-surface-variant flex items-center justify-between">
+        <h3 class="font-headline-md text-on-surface text-[18px]">Client Records</h3>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse min-w-[800px]">
+          <thead>
+            <tr class="bg-surface-container-low">
+              <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">ID</th>
+              <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Created At</th>
+              <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Nama</th>
+              <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Kontak</th>
+              <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Kode Lokasi</th>
+              <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-surface-variant">
+            <tr v-if="loading" class="bg-surface-container-lowest">
+              <td colspan="6" class="px-lg py-xl text-center text-secondary">Loading...</td>
+            </tr>
+            <tr v-else-if="paginatedRecords.length === 0" class="bg-surface-container-lowest">
+              <td colspan="6" class="px-lg py-xl text-center text-secondary">No Data Found.</td>
+            </tr>
+            <tr v-else v-for="record in paginatedRecords" :key="record.id" class="hover:bg-surface-container-low/30 transition-colors group">
+              <td class="px-lg py-md font-label-bold text-on-surface">{{ record.id ? record.id.substring(0,8) + '...' : '-' }}</td>
+              <td class="px-lg py-md text-secondary text-sm">{{ record.created_at ? new Date(record.created_at).toLocaleString() : 'N/A' }}</td>
+              <td class="px-lg py-md font-bold text-on-surface">{{ record.nama || '-' }}</td>
+              <td class="px-lg py-md">
+                <div class="flex items-center gap-2">
+                  <span class="text-secondary">{{ record.kontak || '-' }}</span>
+                  <UButton
+                    v-if="record.kontak"
+                    size="xs"
+                    color="primary"
+                    variant="soft"
+                    icon="i-heroicons-chat-bubble-oval-left-ellipsis"
+                    @click="openWhatsApp(record.kontak)"
+                    title="Message on WhatsApp"
+                  />
+                </div>
+              </td>
+              <td class="px-lg py-md text-on-surface font-bold text-sm">{{ record.kode_lokasi || '-' }}</td>
+              <td class="px-lg py-md text-right">
+                <div class="flex items-center justify-end gap-2">
+                  <UButton
+                    size="xs"
+                    color="primary"
+                    variant="soft"
+                    icon="i-heroicons-pencil-square"
+                    @click="openEditModal(record)"
+                  >
+                    Edit
+                  </UButton>
+                  <UButton
+                    size="xs"
+                    color="error"
+                    variant="soft"
+                    icon="i-heroicons-trash"
+                    @click="openDeleteModal(record)"
+                  >
+                    Delete
+                  </UButton>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- Pagination -->
+      <div v-if="totalPages > 1" class="px-lg py-md bg-surface-container-low border-t border-surface-variant flex items-center justify-between">
+        <p class="text-[11px] text-secondary font-label-md">
+          Showing {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, filteredClientRecords.length) }} of {{ filteredClientRecords.length }} records
+        </p>
+        <UPagination
+          v-model:page="currentPage"
+          :total="filteredClientRecords.length"
+          :items-per-page="PAGE_SIZE"
+          show-edges
+        />
+      </div>
+    </div>
 
     <!-- Insert Client Modal -->
-    <UModal v-model:open="insertModalOpen" title="Add Client" description="Fill in the details to add a new client." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
+    <UModal v-model:open="insertModalOpen" title="Add Client" description="Fill in the details to add a new client." :ui="{ content: 'sm:max-w-2xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-2xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="insertError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="insertError" />
@@ -389,7 +390,7 @@ watch(searchQuery, () => {
     </UModal>
 
     <!-- Edit Client Modal -->
-    <UModal v-model:open="editModalOpen" title="Edit Client" description="Update the client details." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
+    <UModal v-model:open="editModalOpen" title="Edit Client" description="Update the client details." :ui="{ content: 'sm:max-w-2xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-2xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="editError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="editError" />
@@ -438,7 +439,7 @@ watch(searchQuery, () => {
     </UModal>
 
     <!-- Delete Confirmation Modal -->
-    <UModal v-model:open="deleteModalOpen" title="Delete Client" description="This action cannot be undone." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
+    <UModal v-model:open="deleteModalOpen" title="Delete Client" description="This action cannot be undone." :ui="{ content: 'sm:max-w-2xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-2xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="deleteError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="deleteError" />

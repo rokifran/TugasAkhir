@@ -32,15 +32,32 @@ async function logout() {
 }
 
 async function fetchMaintenanceData() {
-  if (!user.value) return
+  // Gunakan fallback ke .sub karena JWT mengembalikan user ID di field 'sub', bukan 'id'
+  const userId = user.value?.id || user.value?.sub
+  if (!userId) return
 
   loading.value = true
   errorMsg.value = null
   try {
+    // Step 1: Cari teknisi.id berdasarkan user_id (auth UUID)
+    // karena maintenance.teknisi_id menyimpan teknisi.id, bukan auth UUID
+    const { data: teknisiData, error: teknisiError } = await supabase
+      .from('teknisi')
+      .select('id')
+      .eq('user_id', userId)
+      .single()
+
+    if (teknisiError) throw teknisiError
+    if (!teknisiData) {
+      errorMsg.value = 'Data teknisi tidak ditemukan untuk akun ini.'
+      return
+    }
+
+    // Step 2: Query maintenance menggunakan teknisi.id yang benar
     const { data, error } = await supabase
       .from('maintenance')
       .select('*, client:client_id(*), maintenance_detail(*, kategori_perangkat:kategori_perangkat_id(*), maintenance_photos(*))')
-      .eq('teknisi_id', user.value.id)
+      .eq('teknisi_id', teknisiData.id)
       .order('created_at', { ascending: false })
 
     if (error) throw error

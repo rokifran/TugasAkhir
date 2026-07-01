@@ -10,64 +10,65 @@
 ───────────────────────────────────────────────── */
 @theme {
   /* Surface scale */
-  --color-surface:                   #f7f9fb;
-  --color-surface-dim:               #d8dadc;
-  --color-surface-bright:            #ffffff;
-  --color-surface-container-lowest:  #ffffff;
-  --color-surface-container-low:     #f2f4f6;
-  --color-surface-container:         #eceef0;
-  --color-surface-container-high:    #e6e8ea;
+  --color-surface: #f7f9fb;
+  --color-surface-dim: #d8dadc;
+  --color-surface-bright: #ffffff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f2f4f6;
+  --color-surface-container: #eceef0;
+  --color-surface-container-high: #e6e8ea;
   --color-surface-container-highest: #e0e3e5;
-  --color-surface-variant:           #e0e3e5;
+  --color-surface-variant: #e0e3e5;
 
   /* Text */
-  --color-on-surface:         #191c1e;
+  --color-on-surface: #191c1e;
   --color-on-surface-variant: #3d4a3d;
-  --color-inverse-surface:    #2d3133;
+  --color-inverse-surface: #2d3133;
   --color-inverse-on-surface: #eff1f3;
 
   /* Borders */
-  --color-outline:         #6d7b6c;
+  --color-outline: #6d7b6c;
   --color-outline-variant: #e2e8f0;
 
   /* Primary — Brand Green */
-  --color-surface-tint:         #22c55e;
-  --color-primary:              #008e2f;  /* button green as shown in image */
-  --color-on-primary:           #ffffff;
-  --color-primary-container:    #22c55e;
+  --color-surface-tint: #22c55e;
+  --color-primary: #008e2f;
+  /* button green as shown in image */
+  --color-on-primary: #ffffff;
+  --color-primary-container: #22c55e;
   --color-on-primary-container: #004b1e;
-  --color-inverse-primary:      #4ae176;
+  --color-inverse-primary: #4ae176;
 
   /* Secondary */
-  --color-secondary:              #565e74;
-  --color-on-secondary:          #ffffff;
-  --color-secondary-container:   #dae2fd;
-  --color-on-secondary-container:#5c647a;
+  --color-secondary: #565e74;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #dae2fd;
+  --color-on-secondary-container: #5c647a;
 
   /* Tertiary */
-  --color-tertiary:              #505f76;
-  --color-on-tertiary:           #ffffff;
-  --color-tertiary-container:    #9dadc6;
+  --color-tertiary: #505f76;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #9dadc6;
   --color-on-tertiary-container: #314156;
 
   /* Error */
-  --color-error:              #ba1a1a;
-  --color-on-error:           #ffffff;
-  --color-error-container:    #ffdad6;
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
   --color-on-error-container: #93000a;
 
   /* Background */
-  --color-background:    #f7f9fb;
+  --color-background: #f7f9fb;
   --color-on-background: #191c1e;
 
   /* ── Typography ── */
-  --font-label-md:    "Inter", sans-serif;
-  --font-label-bold:  "Inter", sans-serif;
+  --font-label-md: "Inter", sans-serif;
+  --font-label-bold: "Inter", sans-serif;
   --font-headline-md: "Plus Jakarta Sans", sans-serif;
   --font-headline-lg: "Plus Jakarta Sans", sans-serif;
-  --font-display:     "Plus Jakarta Sans", sans-serif;
-  --font-body-lg:     "Inter", sans-serif;
-  --font-body-md:     "Inter", sans-serif;
+  --font-display: "Plus Jakarta Sans", sans-serif;
+  --font-body-lg: "Inter", sans-serif;
+  --font-body-md: "Inter", sans-serif;
 
   --text-label-md: 12px;
   --text-label-md--line-height: 16px;
@@ -100,23 +101,30 @@
   --text-body-md--font-weight: 400;
 
   /* ── Spacing ── */
-  --spacing-sm:            8px;
-  --spacing-xs:            4px;
-  --spacing-md:            16px;
+  --spacing-sm: 8px;
+  --spacing-xs: 4px;
+  --spacing-md: 16px;
   --spacing-container-max: 1280px;
-  --spacing-lg:            24px;
-  --spacing-gutter:        20px;
-  --spacing-xl:            32px;
-  --spacing-base:          4px;
+  --spacing-lg: 24px;
+  --spacing-gutter: 20px;
+  --spacing-xl: 32px;
+  --spacing-base: 4px;
 
   /* ── Radius (shapes) ── */
-  --radius-sm:      0.25rem;  /* 4px  */
-  --radius-DEFAULT: 0.5rem;   /* 8px  */
-  --radius-md:      0.75rem;  /* 12px */
-  --radius-lg:      0.5rem;   /* 8px  – buttons / inputs  */
-  --radius-xl:      1rem;     /* 16px – cards rounded-2xl */
-  --radius-2xl:     1rem;     /* 16px – cards             */
-  --radius-full:    9999px;   /* pills / badges           */
+  --radius-sm: 0.25rem;
+  /* 4px  */
+  --radius-DEFAULT: 0.5rem;
+  /* 8px  */
+  --radius-md: 0.75rem;
+  /* 12px */
+  --radius-lg: 0.5rem;
+  /* 8px  – buttons / inputs  */
+  --radius-xl: 1rem;
+  /* 16px – cards rounded-2xl */
+  --radius-2xl: 1rem;
+  /* 16px – cards             */
+  --radius-full: 9999px;
+  /* pills / badges           */
 }
 
 /* ─────────────────────────────────────────────────
@@ -129,71 +137,103 @@
 ───────────────────────────────────────────────── */
 .dark {
   /* ── Override Nuxt UI base variables to match our palette ── */
-  --ui-bg:           #0f111a;
-  --ui-bg-muted:     #13161f;
-  --ui-bg-elevated:  #171a28;
-  --ui-bg-accented:  #1e2235;
-  --ui-bg-inverted:  #f1f5f9;
+  --ui-bg: #0f111a;
+  --ui-bg-muted: #13161f;
+  --ui-bg-elevated: #171a28;
+  --ui-bg-accented: #1e2235;
+  --ui-bg-inverted: #f1f5f9;
 
-  --ui-text:             #c8d6e8;
-  --ui-text-muted:       #94a3b8;
-  --ui-text-toned:       #cbd5e1;
+  --ui-text: #c8d6e8;
+  --ui-text-muted: #94a3b8;
+  --ui-text-toned: #cbd5e1;
   --ui-text-highlighted: #f1f5f9;
-  --ui-text-inverted:    #0f111a;
+  --ui-text-inverted: #0f111a;
 
-  --ui-border:          #334155;
-  --ui-border-muted:    #1e2235;
+  --ui-border: #334155;
+  --ui-border-muted: #1e2235;
   --ui-border-accented: #475569;
   --ui-border-inverted: #f1f5f9;
 
   /* ── Custom surface scale tied to our palette ── */
-  --color-background:                #0f111a;
-  --color-on-background:             #f1f5f9;
-  --color-surface:                   #0f111a;
-  --color-surface-dim:               #0a0c10;
-  --color-surface-bright:            #1e2235;
-  --color-surface-container-lowest:  #0a0c10;
-  --color-surface-container-low:     #13161f;
-  --color-surface-container:         #171a28;
-  --color-surface-container-high:    #1e2235;
+  --color-background: #0f111a;
+  --color-on-background: #f1f5f9;
+  --color-surface: #0f111a;
+  --color-surface-dim: #0a0c10;
+  --color-surface-bright: #1e2235;
+  --color-surface-container-lowest: #0a0c10;
+  --color-surface-container-low: #13161f;
+  --color-surface-container: #171a28;
+  --color-surface-container-high: #1e2235;
   --color-surface-container-highest: #252a3d;
-  --color-surface-variant:           #1e2235;
+  --color-surface-variant: #1e2235;
 
   /* ── Text ── */
-  --color-on-surface:         #c8d6e8;
+  --color-on-surface: #c8d6e8;
   --color-on-surface-variant: #94a3b8;
-  --color-inverse-surface:    #f7f9fb;
+  --color-inverse-surface: #f7f9fb;
   --color-inverse-on-surface: #191c1e;
 
   /* ── Borders ── */
-  --color-outline:         #334155;
+  --color-outline: #334155;
   --color-outline-variant: #1e2235;
 
   /* ── Primary – Pastel Green #4AE176 ── */
-  --color-surface-tint:         #4ae176;
-  --color-primary:              #4ae176;
-  --color-on-primary:           #003914;
-  --color-primary-container:    #006e2f;
+  --color-surface-tint: #4ae176;
+  --color-primary: #4ae176;
+  --color-on-primary: #003914;
+  --color-primary-container: #006e2f;
   --color-on-primary-container: #6bff8f;
-  --color-inverse-primary:      #006e2f;
+  --color-inverse-primary: #006e2f;
 
   /* ── Secondary ── */
-  --color-secondary:               #94a3b8;
-  --color-on-secondary:            #0f172a;
-  --color-secondary-container:     #1e293b;
-  --color-on-secondary-container:  #e2e8f0;
+  --color-secondary: #94a3b8;
+  --color-on-secondary: #0f172a;
+  --color-secondary-container: #1e293b;
+  --color-on-secondary-container: #e2e8f0;
 
   /* ── Tertiary ── */
-  --color-tertiary:              #cbd5e1;
-  --color-on-tertiary:           #1e293b;
-  --color-tertiary-container:    #334155;
+  --color-tertiary: #cbd5e1;
+  --color-on-tertiary: #1e293b;
+  --color-tertiary-container: #334155;
   --color-on-tertiary-container: #f1f5f9;
 
   /* ── Error ── */
-  --color-error:              #ffb4ab;
-  --color-on-error:           #690005;
-  --color-error-container:    #93000a;
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
   --color-on-error-container: #ffdad6;
+}
+
+/* ─────────────────────────────────────────────────
+   SMOOTH DARK / LIGHT MODE TRANSITION
+   All colour-bearing properties animate over 300ms
+   so toggling the theme never looks jarring.
+───────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  transition:
+    color 500ms ease,
+    background-color 500ms ease,
+    border-color 500ms ease,
+    box-shadow 500ms ease,
+    fill 500ms ease,
+    stroke 500ms ease;
+}
+
+/* Exclude elements where instant response matters */
+button,
+a,
+input,
+select,
+textarea {
+  transition:
+    color 500ms ease,
+    background-color 500ms ease,
+    border-color 500ms ease,
+    box-shadow 500ms ease,
+    opacity 200ms ease,
+    transform 200ms ease;
 }
 
 /* ─────────────────────────────────────────────────
@@ -203,6 +243,24 @@
 :root {
   --shadow-card-lvl1: 0 2px 12px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
   --shadow-card-lvl2: 0 10px 32px rgba(15, 23, 42, 0.10);
+
+  /* ── Override Nuxt UI base variables to match our palette ── */
+  --ui-bg: #ffffff;
+  --ui-bg-muted: #f2f4f6;
+  --ui-bg-elevated: #ffffff;
+  --ui-bg-accented: #eceef0;
+  --ui-bg-inverted: #0f111a;
+
+  --ui-text: #191c1e;
+  --ui-text-muted: #565e74;
+  --ui-text-toned: #3d4a3d;
+  --ui-text-highlighted: #191c1e;
+  --ui-text-inverted: #ffffff;
+
+  --ui-border: #e2e8f0;
+  --ui-border-muted: #f1f5f9;
+  --ui-border-accented: #cbd5e1;
+  --ui-border-inverted: #0f111a;
 }
 
 /* ─────────────────────────────────────────────────
@@ -210,8 +268,7 @@
    Force all hard-coded dark/black Tailwind text
    classes to become light when .dark is active
 ───────────────────────────────────────────────── */
-.dark :is(
-  .text-black,
+.dark :is(.text-black,
   .text-gray-950,
   .text-gray-900,
   .text-gray-850,
@@ -227,8 +284,7 @@
   .text-slate-700,
   .text-zinc-900,
   .text-zinc-800,
-  .text-zinc-700
-) {
+  .text-zinc-700) {
   color: #f1f5f9 !important;
 }
 
@@ -239,6 +295,167 @@
 .dark .ring-gray-200 {
   --tw-ring-color: #334155;
 }
+
 .dark .dark\:ring-gray-800 {
   --tw-ring-color: #1e2235;
+}
+
+/* ─────────────────────────────────────────────────
+   DARK MODE — UInput / form fields override
+   Targets the actual rendered <input> elements
+   inside Nuxt UI components in dark mode
+───────────────────────────────────────────────── */
+.dark input[type="text"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="date"],
+.dark input[type="number"],
+.dark input[type="search"],
+.dark input[type="tel"],
+.dark input[type="url"],
+.dark textarea {
+  background-color: #171a28 !important;
+  border-color: #334155 !important;
+  color: #c8d6e8 !important;
+}
+
+.dark input[type="text"]::placeholder,
+.dark input[type="email"]::placeholder,
+.dark input[type="password"]::placeholder,
+.dark input[type="date"]::placeholder,
+.dark input[type="search"]::placeholder,
+.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+.dark input[type="text"]:focus,
+.dark input[type="email"]:focus,
+.dark input[type="password"]:focus,
+.dark input[type="date"]:focus,
+.dark textarea:focus {
+  border-color: #4ae176 !important;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(74, 225, 118, 0.2) !important;
+}
+
+/* ─────────────────────────────────────────────────
+   DARK MODE — USelectMenu trigger button override
+   Nuxt UI v3 (Reka UI) renders select trigger as
+   a button with data-reka-* or aria-haspopup attr.
+   We target by aria attribute which is stable.
+───────────────────────────────────────────────── */
+
+/* Select trigger button */
+.dark button[aria-haspopup="listbox"],
+.dark button[aria-haspopup="dialog"] {
+  background-color: #171a28 !important;
+  border-color: #334155 !important;
+  color: #c8d6e8 !important;
+}
+
+.dark button[aria-haspopup="listbox"]:hover,
+.dark button[aria-haspopup="dialog"]:hover {
+  background-color: #1e2235 !important;
+  border-color: #475569 !important;
+}
+
+/* Dropdown listbox panel */
+.dark [role="listbox"] {
+  background-color: #1e2235 !important;
+  border-color: #334155 !important;
+}
+
+/* Dropdown options */
+.dark [role="option"] {
+  color: #c8d6e8 !important;
+  background-color: transparent !important;
+}
+
+.dark [role="option"]:hover,
+.dark [role="option"][data-highlighted],
+.dark [role="option"][data-state="checked"] {
+  background-color: #252a3d !important;
+  color: #f1f5f9 !important;
+}
+
+/* ─────────────────────────────────────────────────
+   DARK MODE — Modal Button Text Colors
+   Ensure text on Save (primary), Add (primary),
+   and Delete (error) buttons inside modals is dark
+   when dark mode is active.
+───────────────────────────────────────────────── */
+.dark [data-slot="content"] button.bg-primary,
+.dark [data-slot="footer"] button.bg-primary,
+.dark [data-slot="content"] button.bg-primary-container,
+.dark [data-slot="footer"] button.bg-primary-container,
+.dark [data-slot="content"] a.bg-primary,
+.dark [data-slot="footer"] a.bg-primary,
+.dark [data-slot="content"] a.bg-primary-container,
+.dark [data-slot="footer"] a.bg-primary-container {
+  color: var(--color-on-primary, #003914) !important;
+}
+.dark [data-slot="content"] button.bg-primary *,
+.dark [data-slot="footer"] button.bg-primary *,
+.dark [data-slot="content"] button.bg-primary-container *,
+.dark [data-slot="footer"] button.bg-primary-container *,
+.dark [data-slot="content"] a.bg-primary *,
+.dark [data-slot="footer"] a.bg-primary *,
+.dark [data-slot="content"] a.bg-primary-container *,
+.dark [data-slot="footer"] a.bg-primary-container * {
+  color: inherit !important;
+}
+
+.dark [data-slot="content"] button.bg-error,
+.dark [data-slot="footer"] button.bg-error,
+.dark [data-slot="content"] button.bg-red-500,
+.dark [data-slot="footer"] button.bg-red-500,
+.dark [data-slot="content"] button.bg-error-container,
+.dark [data-slot="footer"] button.bg-error-container,
+.dark [data-slot="content"] a.bg-error,
+.dark [data-slot="footer"] a.bg-error,
+.dark [data-slot="content"] a.bg-red-500,
+.dark [data-slot="footer"] a.bg-red-500,
+.dark [data-slot="content"] a.bg-error-container,
+.dark [data-slot="footer"] a.bg-error-container {
+  color: var(--color-on-error, #690005) !important;
+}
+.dark [data-slot="content"] button.bg-error *,
+.dark [data-slot="footer"] button.bg-error *,
+.dark [data-slot="content"] button.bg-red-500 *,
+.dark [data-slot="footer"] button.bg-red-500 *,
+.dark [data-slot="content"] button.bg-error-container *,
+.dark [data-slot="footer"] button.bg-error-container *,
+.dark [data-slot="content"] a.bg-error *,
+.dark [data-slot="footer"] a.bg-error *,
+.dark [data-slot="content"] a.bg-red-500 *,
+.dark [data-slot="footer"] a.bg-red-500 *,
+.dark [data-slot="content"] a.bg-error-container *,
+.dark [data-slot="footer"] a.bg-error-container * {
+  color: inherit !important;
+}
+
+.dark [data-slot="content"] button.bg-success,
+.dark [data-slot="footer"] button.bg-success,
+.dark [data-slot="content"] a.bg-success,
+.dark [data-slot="footer"] a.bg-success {
+  color: #003914 !important;
+}
+.dark [data-slot="content"] button.bg-success *,
+.dark [data-slot="footer"] button.bg-success *,
+.dark [data-slot="content"] a.bg-success *,
+.dark [data-slot="footer"] a.bg-success * {
+  color: inherit !important;
+}
+
+.dark [data-slot="content"] button.bg-warning,
+.dark [data-slot="footer"] button.bg-warning,
+.dark [data-slot="content"] a.bg-warning,
+.dark [data-slot="footer"] a.bg-warning {
+  color: #451a03 !important;
+}
+.dark [data-slot="content"] button.bg-warning *,
+.dark [data-slot="footer"] button.bg-warning *,
+.dark [data-slot="content"] a.bg-warning *,
+.dark [data-slot="footer"] a.bg-warning * {
+  color: inherit !important;
 }

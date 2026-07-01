@@ -449,7 +449,7 @@ watch(searchQuery, () => {
 
     <!-- Modals (keeping Nuxt UI Modal components since Stitch design doesn't provide a custom modal) -->
     <!-- Insert Teknisi Modal -->
-    <UModal v-model:open="insertModalOpen" title="Add Teknisi" description="Fill in the details to add a new technician." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
+    <UModal v-model:open="insertModalOpen" title="Add Teknisi" description="Fill in the details to add a new technician." :ui="{ content: 'sm:max-w-2xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-2xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="insertError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="insertError" />
@@ -490,7 +490,7 @@ watch(searchQuery, () => {
     </UModal>
 
     <!-- Edit Teknisi Modal -->
-    <UModal v-model:open="editModalOpen" title="Edit Teknisi" description="Update the technician details." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
+    <UModal v-model:open="editModalOpen" title="Edit Teknisi" description="Update the technician details." :ui="{ content: 'sm:max-w-2xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-2xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="editError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="editError" />
@@ -521,7 +521,7 @@ watch(searchQuery, () => {
     </UModal>
 
     <!-- Delete Confirmation Modal -->
-    <UModal v-model:open="deleteModalOpen" title="Delete Teknisi" description="This action cannot be undone." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
+    <UModal v-model:open="deleteModalOpen" title="Delete Teknisi" description="This action cannot be undone." :ui="{ content: 'sm:max-w-2xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-2xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="deleteError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="deleteError" />
@@ -547,7 +547,7 @@ watch(searchQuery, () => {
     </UModal>
 
     <!-- Deactivate Confirmation Modal -->
-    <UModal v-model:open="deactivateModalOpen" title="Deactivate Teknisi" description="This will remove the technician's access immediately." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
+    <UModal v-model:open="deactivateModalOpen" title="Deactivate Teknisi" description="This will remove the technician's access immediately." :ui="{ content: 'sm:max-w-2xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-2xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="deactivateError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="deactivateError" />
@@ -573,7 +573,7 @@ watch(searchQuery, () => {
     </UModal>
 
     <!-- Activate Confirmation Modal -->
-    <UModal v-model:open="activateModalOpen" title="Activate Teknisi" description="This will restore the technician's access." :ui="{ content: 'sm:max-w-2xl w-full', width: 'sm:max-w-2xl w-full' }">
+    <UModal v-model:open="activateModalOpen" title="Activate Teknisi" description="This will restore the technician's access." :ui="{ content: 'sm:max-w-2xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-2xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="activateError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="activateError" />
