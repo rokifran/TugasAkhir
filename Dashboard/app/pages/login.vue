@@ -90,7 +90,7 @@ onMounted(() => {
               <label class="font-label-bold text-label-bold text-on-surface-variant ml-xs" for="email">Email atau Username</label>
               <div class="relative group">
                 <span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors">person</span>
-                <input class="w-full h-11 pl-[48px] pr-md bg-surface-container-low border-transparent focus:border-primary focus:bg-white focus:ring-0 rounded-xl transition-all duration-200 font-body-md text-on-surface"
+                <input class="w-full h-11 pl-[48px] pr-md bg-surface-container-low border-transparent focus:border-primary focus:bg-white focus:ring-0 rounded-lg transition-all duration-200 font-body-md text-on-surface"
                   id="email"
                   placeholder="contoh@maintenapp.com"
                   type="text"
@@ -106,7 +106,7 @@ onMounted(() => {
               </div>
               <div class="relative group">
                 <span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors">lock</span>
-                <input class="w-full h-11 pl-[48px] pr-[48px] bg-surface-container-low border-transparent focus:border-primary focus:bg-white focus:ring-0 rounded-xl transition-all duration-200 font-body-md text-on-surface"
+                <input class="w-full h-11 pl-[48px] pr-[48px] bg-surface-container-low border-transparent focus:border-primary focus:bg-white focus:ring-0 rounded-lg transition-all duration-200 font-body-md text-on-surface"
                   id="password"
                   placeholder="••••••••"
                   :type="showPassword ? 'text' : 'password'"
@@ -132,7 +132,7 @@ onMounted(() => {
               <a class="font-label-md text-label-md text-primary font-bold hover:underline" href="#">Lupa Kata Sandi?</a>
             </div>
             <!-- Login Button -->
-            <button class="w-full h-[48px] bg-primary-container text-white font-headline-md text-headline-md rounded-xl hover:opacity-90 active:scale-[0.98] transition-all duration-200 shadow-lg shadow-primary-container/20 mt-md flex items-center justify-center gap-sm"
+            <button class="w-full h-[48px] bg-primary-container text-white font-headline-md text-headline-md rounded-lg hover:opacity-90 active:scale-[0.98] transition-all duration-200 shadow-lg shadow-primary-container/20 mt-md flex items-center justify-center gap-sm"
               type="submit"
               :disabled="!email || !password || loading">
               <span v-if="loading" class="material-symbols-outlined spin-icon">progress_activity</span>

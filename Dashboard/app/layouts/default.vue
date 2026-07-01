@@ -2,7 +2,7 @@
   <div class="font-body-md text-body-md overflow-x-hidden bg-background text-on-surface min-h-screen">
     <!-- Sidebar Component -->
     <aside 
-      class="hidden md:flex flex-col h-full fixed left-0 top-0 bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant z-50 transition-all duration-300"
+      class="hidden md:flex flex-col h-full fixed left-0 top-0 bg-surface-container-low dark:bg-[#13161f] border-r border-outline-variant dark:border-[#1e2235] z-50 transition-all duration-300"
       :class="isCollapsed ? 'w-[80px]' : 'w-[260px]'"
     >
       <!-- Brand Header -->
@@ -54,7 +54,7 @@
         </a>
         <button 
           @click="logout" 
-          class="w-full flex items-center gap-md px-lg py-md text-error hover:bg-error-container/20 transition-all rounded-lg group"
+          class="w-full min-h-[44px] flex items-center gap-md px-lg py-md text-error hover:bg-error-container/20 transition-all rounded-lg group"
           :class="isCollapsed ? 'justify-center px-0' : ''"
           :title="isCollapsed ? 'Logout' : ''"
         >
@@ -69,19 +69,19 @@
       :class="isCollapsed ? 'md:ml-[80px]' : 'md:ml-[260px]'"
     >
       <!-- TopAppBar Component -->
-      <header class="flex items-center justify-between px-lg w-full sticky top-0 z-40 bg-surface-container-lowest dark:bg-inverse-surface h-16 border-b border-surface-variant shadow-sm">
+      <header class="flex items-center justify-between px-lg w-full sticky top-0 z-40 bg-surface-container-lowest dark:bg-[#0f111a] h-16 border-b border-outline-variant dark:border-[#1e2235] shadow-sm">
         <div class="flex items-center gap-lg">
           <button 
             @click="isCollapsed = !isCollapsed" 
-            class="hidden md:flex p-1.5 rounded-lg hover:bg-surface-variant text-secondary transition-colors items-center justify-center"
+            class="hidden md:flex p-1.5 min-h-[44px] min-w-[44px] rounded-lg hover:bg-surface-variant text-secondary transition-colors items-center justify-center"
             :title="isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'"
           >
             <span class="material-symbols-outlined">{{ isCollapsed ? 'menu_open' : 'menu' }}</span>
           </button>
           <div class="md:hidden font-headline-lg text-headline-md font-bold text-primary">MaintenApp</div>
-          <div class="hidden md:flex items-center bg-surface-container-low px-md py-sm rounded-full w-80 border border-outline-variant">
+          <div class="hidden md:flex items-center bg-surface-container-low dark:bg-[#1e2235] px-md py-sm rounded-lg w-80 border border-outline-variant dark:border-[#334155] focus-within:bg-surface-container-lowest dark:focus-within:bg-[#171a28] focus-within:border-primary dark:focus-within:border-primary transition-colors">
             <span class="material-symbols-outlined text-secondary mr-sm text-[20px]">search</span>
-            <input v-model="localSearch" class="bg-transparent border-none focus:ring-0 text-body-md w-full placeholder:text-secondary/60 py-0 outline-none" placeholder="Cari teknisi, client, lokasi, atau ID order..." type="text">
+            <input v-model="localSearch" class="bg-transparent border-none focus:ring-0 text-body-md w-full placeholder:text-secondary/60 py-0 outline-none h-full" placeholder="Cari teknisi, client, lokasi, atau ID order..." type="text">
           </div>
         </div>
         
@@ -96,7 +96,7 @@
             />
           </ClientOnly>
           
-          <button class="md:hidden p-2 text-secondary" @click="mobileMenuOpen = !mobileMenuOpen">
+          <button class="md:hidden p-2 text-secondary min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg" @click="mobileMenuOpen = !mobileMenuOpen">
             <span class="material-symbols-outlined">menu</span>
           </button>
         </div>
@@ -104,7 +104,7 @@
       
       <!-- Mobile Sidebar -->
       <USlideover v-model="mobileMenuOpen" side="left" class="md:hidden">
-        <div class="flex flex-col h-full bg-surface-container-low dark:bg-inverse-surface text-on-surface">
+        <div class="flex flex-col h-full bg-surface-container-low dark:bg-[#13161f] text-on-surface">
            <div class="p-lg flex items-center gap-md border-b border-outline-variant/30">
             <div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-white">
               <span class="material-symbols-outlined">engineering</span>
@@ -137,7 +137,7 @@
               <span class="material-symbols-outlined transition-transform group-hover:scale-110">help</span>
               <span class="font-body-md">Help Center</span>
             </a>
-            <button @click="logout" class="w-full flex items-center gap-md px-lg py-md text-error hover:bg-error-container/20 transition-all rounded-lg group">
+            <button @click="logout" class="w-full min-h-[44px] flex items-center gap-md px-lg py-md text-error hover:bg-error-container/20 transition-all rounded-lg group">
               <span class="material-symbols-outlined transition-transform group-hover:scale-110">logout</span>
               <span class="font-body-md">Logout</span>
             </button>

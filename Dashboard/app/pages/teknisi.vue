@@ -317,7 +317,7 @@ watch(searchQuery, () => {
         <button
           v-if="user"
           @click="openInsertModal"
-          class="flex items-center gap-sm px-lg py-sm bg-primary-container text-on-primary rounded-lg font-label-bold hover:brightness-105 transition-all shadow-sm active:scale-95"
+          class="flex items-center gap-sm px-lg py-sm bg-primary-container text-white rounded-lg font-label-bold hover:brightness-105 transition-all shadow-sm active:scale-95"
         >
           <span class="material-symbols-outlined text-[20px]">add</span>
           <span>Add Teknisi</span>
@@ -334,7 +334,7 @@ watch(searchQuery, () => {
       <UButton to="/login" color="primary">Go to Login</UButton>
     </div>
 
-    <div v-else class="bg-surface-container-lowest rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant overflow-hidden mb-xl">
+    <div v-else class="bg-surface-container-lowest rounded-2xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant overflow-hidden mb-xl">
       <div class="px-lg py-md border-b border-surface-variant flex items-center justify-between">
         <h3 class="font-headline-md text-on-surface text-[18px]">Teknisi Records</h3>
       </div>
@@ -525,7 +525,7 @@ watch(searchQuery, () => {
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="deleteError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="deleteError" />
-          <div class="flex items-start gap-4 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+          <div class="flex items-start gap-4 p-4 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
             <UIcon name="i-heroicons-exclamation-triangle" class="w-8 h-8 text-red-500 shrink-0 mt-0.5" />
             <div>
               <p class="text-sm font-semibold text-red-800 dark:text-red-300">
@@ -551,7 +551,7 @@ watch(searchQuery, () => {
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="deactivateError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="deactivateError" />
-          <div class="flex items-start gap-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+          <div class="flex items-start gap-4 p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
             <UIcon name="i-heroicons-exclamation-triangle" class="w-8 h-8 text-amber-500 shrink-0 mt-0.5" />
             <div>
               <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">
@@ -577,7 +577,7 @@ watch(searchQuery, () => {
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="activateError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="activateError" />
-          <div class="flex items-start gap-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+          <div class="flex items-start gap-4 p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
             <UIcon name="i-heroicons-check-circle" class="w-8 h-8 text-emerald-500 shrink-0 mt-0.5" />
             <div>
               <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">

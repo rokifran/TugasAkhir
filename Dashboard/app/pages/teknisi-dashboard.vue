@@ -133,7 +133,7 @@ onMounted(() => {
 
     <!-- Stats Row -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-lg mb-xl">
-      <div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
+      <div class="bg-surface-container-lowest p-lg rounded-2xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
         <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-primary-container"></div>
         <p class="text-secondary font-label-bold mb-base uppercase tracking-wider text-[10px]">Total Tugas</p>
         <div class="flex items-end gap-sm">
@@ -141,7 +141,7 @@ onMounted(() => {
         </div>
         <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-7xl text-primary-container/10 group-hover:text-primary-container/20 transition-colors">task</span>
       </div>
-      <div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
+      <div class="bg-surface-container-lowest p-lg rounded-2xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
         <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-[#EAB308]"></div>
         <p class="text-secondary font-label-bold mb-base uppercase tracking-wider text-[10px]">Tugas Pending</p>
         <div class="flex items-end gap-sm">
@@ -149,7 +149,7 @@ onMounted(() => {
         </div>
         <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-7xl text-[#EAB308]/10 group-hover:text-[#EAB308]/20 transition-colors">pending_actions</span>
       </div>
-      <div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
+      <div class="bg-surface-container-lowest p-lg rounded-2xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
         <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-primary"></div>
         <p class="text-secondary font-label-bold mb-base uppercase tracking-wider text-[10px]">Selesai</p>
         <div class="flex items-end gap-sm">
@@ -168,13 +168,13 @@ onMounted(() => {
         <p class="font-body-md">Memuat data tugas...</p>
       </div>
 
-      <div v-else-if="maintenanceRecords.length === 0" class="text-center py-20 bg-surface-container-lowest rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant">
+      <div v-else-if="maintenanceRecords.length === 0" class="text-center py-20 bg-surface-container-lowest rounded-2xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant">
         <span class="material-symbols-outlined text-[64px] text-surface-variant mb-4">assignment</span>
         <h2 class="text-xl font-bold text-on-surface mb-2">Tidak Ada Tugas</h2>
         <p class="text-secondary font-body-md">Anda belum memiliki tugas maintenance yang dijadwalkan.</p>
       </div>
 
-      <div v-else-if="filteredMaintenanceRecords.length === 0" class="text-center py-20 bg-surface-container-lowest rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant">
+      <div v-else-if="filteredMaintenanceRecords.length === 0" class="text-center py-20 bg-surface-container-lowest rounded-2xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant">
         <span class="material-symbols-outlined text-[64px] text-surface-variant mb-4">search_off</span>
         <h2 class="text-xl font-bold text-on-surface mb-2">Tugas Tidak Ditemukan</h2>
         <p class="text-secondary font-body-md">Tidak ada tugas maintenance yang cocok dengan pencarian Anda.</p>
@@ -184,7 +184,7 @@ onMounted(() => {
         <div 
           v-for="record in filteredMaintenanceRecords" 
           :key="record.id"
-          class="bg-surface-container-lowest rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant overflow-hidden group hover:border-primary/50 transition-colors"
+          class="bg-surface-container-lowest rounded-2xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant overflow-hidden group hover:border-primary/50 transition-colors"
         >
           <!-- Card Header -->
           <div class="px-lg py-md border-b border-surface-variant flex flex-col md:flex-row md:items-center justify-between gap-md bg-surface-container-low/50">
@@ -230,9 +230,15 @@ onMounted(() => {
               <div 
                 v-for="detail in record.maintenance_detail" 
                 :key="detail.id"
-                class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-md rounded-lg border border-surface-variant bg-surface-container-lowest hover:bg-surface-container-low transition-colors gap-4"
+                class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-md rounded-2xl border border-surface-variant bg-surface-container-lowest hover:bg-surface-container-low transition-colors gap-4 relative overflow-hidden"
               >
-                <div>
+                <!-- Vertical Status Bar (Kiri) -->
+                <div 
+                  class="absolute left-0 top-0 bottom-0 w-2"
+                  :class="detail.catatan_kerusakan ? 'bg-[#EAB308]' : 'bg-[#22C55E]'"
+                ></div>
+                
+                <div class="pl-2">
                   <p class="font-label-bold text-on-surface text-[14px]">
                     {{ detail.kategori_perangkat?.kategori }} - {{ detail.kategori_perangkat?.nama_perangkat }}
                   </p>

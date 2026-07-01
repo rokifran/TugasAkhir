@@ -496,7 +496,7 @@ watch(user, (newUser) => {
     <template v-else>
       <!-- Dashboard Stats Grid (Bento Style) -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-lg mb-xl">
-        <div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
+        <div class="bg-surface-container-lowest p-lg rounded-2xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
           <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-[#EAB308]"></div>
           <p class="text-secondary font-label-bold mb-base uppercase tracking-wider text-[10px]">Pending Task</p>
           <div class="flex items-end gap-sm">
@@ -504,7 +504,7 @@ watch(user, (newUser) => {
           </div>
           <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-7xl text-[#EAB308]/10 group-hover:text-[#EAB308]/20 transition-colors">pending_actions</span>
         </div>
-        <div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
+        <div class="bg-surface-container-lowest p-lg rounded-2xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
           <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-primary"></div>
           <p class="text-secondary font-label-bold mb-base uppercase tracking-wider text-[10px]">Completed Task</p>
           <div class="flex items-end gap-sm">
@@ -512,7 +512,7 @@ watch(user, (newUser) => {
           </div>
           <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-7xl text-primary/10 group-hover:text-primary/20 transition-colors">assignment_turned_in</span>
         </div>
-        <div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
+        <div class="bg-surface-container-lowest p-lg rounded-2xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
           <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-secondary"></div>
           <p class="text-secondary font-label-bold mb-base uppercase tracking-wider text-[10px]">Teknisi Aktif</p>
           <div class="flex items-end gap-sm">
@@ -520,7 +520,7 @@ watch(user, (newUser) => {
           </div>
           <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-7xl text-secondary/10 group-hover:text-secondary/20 transition-colors">engineering</span>
         </div>
-        <div class="bg-surface-container-lowest p-lg rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
+        <div class="bg-surface-container-lowest p-lg rounded-2xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant relative overflow-hidden group">
           <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-primary-container"></div>
           <p class="text-secondary font-label-bold mb-base uppercase tracking-wider text-[10px]">TOTAL Teknisi</p>
           <div class="flex items-end gap-sm">
@@ -531,7 +531,7 @@ watch(user, (newUser) => {
       </div>
 
       <!-- Table Section -->
-      <div class="bg-surface-container-lowest rounded-xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant overflow-hidden mb-xl">
+      <div class="bg-surface-container-lowest rounded-2xl shadow-[0px_10px_32px_rgba(15,23,42,0.10)] border border-outline-variant overflow-hidden mb-xl">
         <div class="px-lg py-md border-b border-surface-variant flex items-center justify-between">
           <h3 class="font-headline-md text-on-surface text-[18px]">Recent Activity</h3>
         </div>

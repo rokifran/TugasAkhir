@@ -241,7 +241,7 @@ watch(searchQuery, () => {
         <button
           v-if="user"
           @click="openInsertModal"
-          class="flex items-center gap-sm px-lg py-sm bg-primary-container text-on-primary rounded-lg font-label-bold hover:brightness-105 transition-all shadow-sm active:scale-95"
+          class="flex items-center gap-sm px-lg py-sm bg-primary-container text-white rounded-lg font-label-bold hover:brightness-105 transition-all shadow-sm active:scale-95"
         >
           <span class="material-symbols-outlined text-[20px]">add</span>
           <span>Add Client</span>
@@ -442,7 +442,7 @@ watch(searchQuery, () => {
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="deleteError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="deleteError" />
-          <div class="flex items-start gap-4 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+          <div class="flex items-start gap-4 p-4 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
             <UIcon name="i-heroicons-exclamation-triangle" class="w-8 h-8 text-red-500 shrink-0 mt-0.5" />
             <div>
               <p class="text-sm font-semibold text-red-800 dark:text-red-300">
