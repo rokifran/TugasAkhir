@@ -4,6 +4,7 @@ import { ref, onMounted, computed } from 'vue'
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
 const roleState = useState('user-role')
+const toast = useToast()
 
 const searchQuery = useState('search-query', () => '')
 const maintenanceRecords = ref([])
@@ -23,7 +24,7 @@ const filteredMaintenanceRecords = computed(() => {
 
 const loading = ref(false)
 const errorMsg = ref(null)
-const uploadLoading = ref(false)
+const uploadingDetails = ref({})
 
 async function logout() {
   await supabase.auth.signOut()
@@ -73,8 +74,23 @@ async function handleFileUpload(maintenanceId, detailId, event) {
   const file = event.target.files[0]
   if (!file) return
 
-  uploadLoading.value = true
   errorMsg.value = null
+
+  // File Validation
+  const maxSize = 5 * 1024 * 1024 // 5MB
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+
+  if (file.size > maxSize) {
+    errorMsg.value = 'Ukuran file terlalu besar. Maksimal 5MB.'
+    return
+  }
+
+  if (!allowedTypes.includes(file.type)) {
+    errorMsg.value = 'Tipe file tidak didukung. Gunakan JPEG, PNG, atau WebP.'
+    return
+  }
+
+  uploadingDetails.value[detailId] = true
 
   try {
     const fileExt = file.name.split('.').pop()
@@ -97,11 +113,21 @@ async function handleFileUpload(maintenanceId, detailId, event) {
 
     if (updateError) throw updateError
 
+    toast.add({
+      title: 'Berhasil',
+      description: 'Bukti foto berhasil diunggah',
+      color: 'green'
+    })
     await fetchMaintenanceData()
   } catch (error) {
     errorMsg.value = error.message
+    toast.add({
+      title: 'Gagal Unggah',
+      description: error.message,
+      color: 'red'
+    })
   } finally {
-    uploadLoading.value = false
+    uploadingDetails.value[detailId] = false
   }
 }
 
@@ -280,10 +306,10 @@ onMounted(() => {
                       accept="image/*" 
                       @change="handleFileUpload(record.id, detail.id, $event)"
                       class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      :disabled="uploadLoading"
+                      :disabled="uploadingDetails[detail.id]"
                     />
-                    <button :class="['flex items-center justify-center gap-xs px-sm py-1 text-[11px] font-label-bold border rounded transition-colors w-full', uploadLoading ? 'text-secondary bg-surface-variant border-outline-variant cursor-wait' : 'text-primary bg-primary-container/30 border-primary/20 hover:bg-primary-container/50']">
-                      <span v-if="uploadLoading" class="material-symbols-outlined text-[14px] animate-spin">autorenew</span>
+                    <button :class="['flex items-center justify-center gap-xs px-sm py-1 text-[11px] font-label-bold border rounded transition-colors w-full', uploadingDetails[detail.id] ? 'text-secondary bg-surface-variant border-outline-variant cursor-wait' : 'text-primary bg-primary-container/30 border-primary/20 hover:bg-primary-container/50']">
+                      <span v-if="uploadingDetails[detail.id]" class="material-symbols-outlined text-[14px] animate-spin">autorenew</span>
                       <span v-else class="material-symbols-outlined text-[14px]">upload_file</span>
                       Upload Bukti
                     </button>
