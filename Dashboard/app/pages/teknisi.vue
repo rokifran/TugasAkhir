@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
@@ -12,6 +12,8 @@ const insertModalOpen = ref(false)
 const insertLoading = ref(false)
 const insertError = ref(null)
 const insertSuccess = ref(false)
+const formEmail = ref('')
+const formPassword = ref('')
 
 // Edit Modal state
 const editModalOpen = ref(false)
@@ -26,6 +28,13 @@ const deleteLoading = ref(false)
 const deleteError = ref(null)
 const deleteRecordId = ref(null)
 const deleteRecordLabel = ref('')
+
+// Deactivate Modal state
+const deactivateModalOpen = ref(false)
+const deactivateLoading = ref(false)
+const deactivateError = ref(null)
+const deactivateRecordId = ref(null)
+const deactivateRecordLabel = ref('')
 
 // Form fields (shared between insert & edit)
 const formNama = ref('')
@@ -51,7 +60,7 @@ async function getTeknisiData() {
   loading.value = true;
   errorMsg.value = null;
   try {
-    const { data, error } = await supabase.from('teknisi').select().order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('teknisi').select('*, user_id').order('created_at', { ascending: false })
     if (error) throw error
     teknisiRecords.value = data || []
     currentPage.value = 1
@@ -74,13 +83,16 @@ function openInsertModal() {
   formNama.value = ''
   formKontak.value = ''
   formKodeLokasi.value = ''
+  formEmail.value = ''
+  formPassword.value = ''
   insertError.value = null
   insertSuccess.value = false
   insertModalOpen.value = true
+  // fetchDropdownData()
 }
 
 async function insertTeknisi() {
-  if (!formNama.value.trim() || !formKontak.value.trim() || !formKodeLokasi.value.trim()) {
+  if (!formNama.value.trim() || !formKontak.value.trim() || !formKodeLokasi.value.trim() || !formEmail.value.trim() || !formPassword.value.trim()) {
     insertError.value = 'All fields are required.'
     return
   }
@@ -90,13 +102,17 @@ async function insertTeknisi() {
   insertSuccess.value = false
 
   try {
-    const { error } = await supabase
-      .from('teknisi')
-      .insert({
+    const { data, error } = await $fetch('/api/teknisi/create', {
+      method: 'POST',
+      body: {
         nama: formNama.value.trim(),
+        email: formEmail.value.trim(),
+        password: formPassword.value.trim(),
         kontak: formKontak.value.trim(),
         kode_lokasi: formKodeLokasi.value.trim()
-      })
+      }
+    })
+
     if (error) throw error
 
     insertSuccess.value = true
@@ -105,7 +121,7 @@ async function insertTeknisi() {
       insertModalOpen.value = false
     }, 800)
   } catch (error) {
-    insertError.value = error.message
+    insertError.value = error.data?.statusMessage || error.message || 'An error occurred.'
   } finally {
     insertLoading.value = false
   }
@@ -155,12 +171,19 @@ async function updateTeknisi() {
   }
 }
 
-// ── DELETE ──────────────────────────────────
+// ── DELETE & DEACTIVATE ──────────────────────────────────
 function openDeleteModal(record) {
-  deleteRecordId.value = record.id
+  deleteRecordId.value = record.user_id
   deleteRecordLabel.value = record.nama || record.id
   deleteError.value = null
   deleteModalOpen.value = true
+}
+
+function openDeactivateModal(record) {
+  deactivateRecordId.value = record.user_id
+  deactivateRecordLabel.value = record.nama || record.id
+  deactivateError.value = null
+  deactivateModalOpen.value = true
 }
 
 async function deleteTeknisi() {
@@ -168,18 +191,36 @@ async function deleteTeknisi() {
   deleteError.value = null
 
   try {
-    const { error } = await supabase
-      .from('teknisi')
-      .delete()
-      .eq('id', deleteRecordId.value)
-    if (error) throw error
+    await $fetch('/api/teknisi/delete', {
+      method: 'DELETE',
+      body: { id: deleteRecordId.value }
+    })
 
     await getTeknisiData()
     deleteModalOpen.value = false
   } catch (error) {
-    deleteError.value = error.message
+    deleteError.value = error.data?.statusMessage || error.message || 'An error occurred.'
   } finally {
     deleteLoading.value = false
+  }
+}
+
+async function deactivateTeknisi() {
+  deactivateLoading.value = true
+  deactivateError.value = null
+
+  try {
+    await $fetch('/api/teknisi/deactivate', {
+      method: 'POST',
+      body: { id: deactivateRecordId.value }
+    })
+
+    await getTeknisiData()
+    deactivateModalOpen.value = false
+  } catch (error) {
+    deactivateError.value = error.data?.statusMessage || error.message || 'An error occurred.'
+  } finally {
+    deactivateLoading.value = false
   }
 }
 
@@ -302,6 +343,15 @@ watch(user, (newUser) => {
                 >
                   Delete
                 </UButton>
+                <UButton
+                  size="xs"
+                  color="warning"
+                  variant="soft"
+                  icon="i-heroicons-user-minus"
+                  @click="openDeactivateModal(row.original)"
+                >
+                  Deactivate
+                </UButton>
               </div>
             </template>
           </UTable>
@@ -328,6 +378,30 @@ watch(user, (newUser) => {
         <div class="space-y-5">
           <UAlert v-if="insertError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="insertError" />
           <UAlert v-if="insertSuccess" icon="i-heroicons-check-circle" color="success" variant="soft" title="Teknisi added successfully!" />
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Email</label>
+            <UInput
+              v-model="formEmail"
+              type="email"
+              placeholder="email@example.com"
+              icon="i-heroicons-envelope"
+              size="lg"
+              class="w-full"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Password</label>
+            <UInput
+              v-model="formPassword"
+              type="password"
+              placeholder="••••••••"
+              icon="i-heroicons-lock-closed"
+              size="lg"
+              class="w-full"
+            />
+          </div>
 
           <div>
             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Nama</label>
@@ -432,7 +506,7 @@ watch(user, (newUser) => {
                 Are you sure you want to delete "{{ deleteRecordLabel }}"?
               </p>
               <p class="text-xs text-red-600 dark:text-red-400 mt-1">
-                This will permanently remove this technician from the database.
+                This will permanently remove this technician from the database and their account.
               </p>
             </div>
           </div>
@@ -442,6 +516,32 @@ watch(user, (newUser) => {
         <div class="flex justify-end gap-3">
           <UButton label="Cancel" color="neutral" variant="soft" @click="deleteModalOpen = false" :disabled="deleteLoading" />
           <UButton label="Delete" color="error" icon="i-heroicons-trash" @click="deleteTeknisi" :loading="deleteLoading" :disabled="deleteLoading" />
+        </div>
+      </template>
+    </UModal>
+
+    <!-- Deactivate Confirmation Modal -->
+    <UModal v-model:open="deactivateModalOpen" title="Deactivate Teknisi" description="This will remove the technician's access immediately.">
+      <template #body>
+        <div class="space-y-4">
+          <UAlert v-if="deactivateError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="deactivateError" />
+          <div class="flex items-start gap-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+            <UIcon name="i-heroicons-exclamation-triangle" class="w-8 h-8 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Are you sure you want to deactivate "{{ deactivateRecordLabel }}"?
+              </p>
+              <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                This will remove their access to the application.
+              </p>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <UButton label="Cancel" color="neutral" variant="soft" @click="deactivateModalOpen = false" :disabled="deactivateLoading" />
+          <UButton label="Deactivate" color="warning" icon="i-heroicons-user-minus" @click="deactivateTeknisi" :loading="deactivateLoading" :disabled="deactivateLoading" />
         </div>
       </template>
     </UModal>

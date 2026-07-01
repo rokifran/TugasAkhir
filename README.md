@@ -8,10 +8,10 @@ This document provides a technical overview of the **MaintenApp** project, inten
 
 - **Frontend Framework:** [Nuxt.js](https://nuxt.com/) (Vue.js)
 - **Backend-as-a-Service (BaaS):** [Supabase](https://supabase.com/)
-  - **Database:** PostgreSQL
-  - **Authentication:** Supabase Auth
-  - **Realtime:** Supabase Realtime (Postgres Changes)
-  - **Storage:** Supabase Storage (for maintenance proof photos)
+ - **Database:** PostgreSQL
+ - **Authentication:** Supabase Auth
+ - **Realtime:** Supabase Realtime (Postgres Changes)
+ - **Storage:** Supabase Storage (for maintenance proof photos)
 - **Notifications:** WhatsApp API Integration (via `WhatsappFonnte` or `WhatsappGateway`)
 - **Styling:** Tailwind CSS & Nuxt UI
 
@@ -21,21 +21,21 @@ This document provides a technical overview of the **MaintenApp** project, inten
 
 The application follows a modern, decoupled architecture:
 
-1.  **Client Layer (Nuxt.js):** A single-page application (SPA) that handles the UI for both Admins and Technicians. It interacts directly with Supabase via the Supabase Client SDK.
-2.  **Backend Layer (Supabase):** Acts as the central engine, handling database management, user authentication, file storage, and real-time data synchronization.
-3.  **Integration Layer (WhatsApp Gateway):** A service that listens for specific events (or is triggered by application logic) to send automated WhatsApp notifications to technicians and clients.
+1. **Client Layer (Nuxt.js):** A single-page application (SPA) that handles the UI for both Admins and Technicians. It interacts directly with Supabase via the Supabase Client SDK.
+2. **Backend Layer (Supabase):** Acts as the central engine, handling database management, user authentication, file storage, and real-time data synchronization.
+3. **Integration Layer (WhatsApp Gateway):** A service that listens for specific events (or is triggered by application logic) to send automated WhatsApp notifications to technicians and clients.
 
 ### High-Level Data Flow
 
 ```mermaid
 graph TD
-    Admin[Admin / Boss] -->|1. Create Task| Dashboard[Nuxt Dashboard]
-    Dashboard -->|2. Save| DB[(Supabase Database)]
-    DB -->|3. Trigger| WA[WhatsApp Gateway]
-    WA -->|4. Notify| Tech[Technician / Worker]
-    Tech -->|5. Update Status| TechDash[Technician Dashboard]
-    TechDash -->|6. Update| DB
-    DB -.->|7. Real-time Sync| Dashboard
+ Admin[Admin / Boss] -->|1. Create Task| Dashboard[Nuxt Dashboard]
+ Dashboard -->|2. Save| DB[(Supabase Database)]
+ DB -->|3. Trigger| WA[WhatsApp Gateway]
+ WA -->|4. Notify| Tech[Technician / Worker]
+ Tech -->|5. Update Status| TechDash[Technician Dashboard]
+ TechDash -->|6. Update| DB
+ DB -.->|7. Real-time Sync| Dashboard
 ```
 
 ---
@@ -48,47 +48,47 @@ The database is relational and designed to support complex maintenance schedulin
 
 ```mermaid
 erDiagram
-    users ||--|| teknisi : "has profile"
-    teknisi ||--o{ maintenance : "performs"
-    client ||--o{ maintenance : "receives"
-    maintenance ||--|{ maintenance_detail : "contains"
-    kategori_perangkat ||--o{ maintenance_detail : "categorizes"
+ users ||--|| teknisi : "has profile"
+ teknisi ||--o{ maintenance : "performs"
+ client ||--o{ maintenance : "receives"
+ maintenance ||--|{ maintenance_detail : "contains"
+ kategori_perangkat ||--o{ maintenance_detail : "categorizes"
 
-    users {
-        uuid id PK
-        text email
-        enum role
-    }
-    teknisi {
-        uuid id PK, FK
-        text nama
-        text kontak
-        text kode_lokasi
-    }
-    client {
-        uuid id PK
-        text nama
-        text kontak
-    }
-    kategori_perangkat {
-        uuid id PK
-        text kategori
-        text nama_perangkat
-    }
-    maintenance {
-        uuid id PK
-        uuid teknisi FK
-        uuid client FK
-        text kode_lokasi
-        timestamp tanggal_maintenance
-        boolean status
-    }
-    maintenance_detail {
-        uuid id PK
-        uuid maintenance_id FK
-        uuid kategori_perangkat_id FK
-        text catatan_kerusakan
-    }
+ users {
+ uuid id PK
+ text email
+ enum role
+ }
+ teknisi {
+ uuid id PK, FK
+ text nama
+ text kontak
+ text kode_lokasi
+ }
+ client {
+ uuid id PK
+ text nama
+ text kontak
+ }
+ kategori_perangkat {
+ uuid id PK
+ text kategori
+ text nama_perangkat
+ }
+ maintenance {
+ uuid id PK
+ uuid teknisi FK
+ uuid client FK
+ text kode_lokasi
+ timestamp tanggal_maintenance
+ boolean status
+ }
+ maintenance_detail {
+ uuid id PK
+ uuid maintenance_id FK
+ uuid kategori_perangkat_id FK
+ text catatan_kerusakan
+ }
 ```
 
 ### Core Tables Detail
@@ -142,12 +142,12 @@ A child table of `maintenance` to support multiple devices per task (One-to-Many
 To ensure the Admin dashboard stays up-to-date, we use Supabase Realtime. In Nuxt components, you will typically see:
 ```javascript
 supabase
-  .channel('maintenance-changes')
-  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'maintenance' }, payload => {
-    // Refresh data or update local state
-    getMaintenanceData()
-  })
-  .subscribe()
+ .channel('maintenance-changes')
+ .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'maintenance' }, payload => {
+ // Refresh data or update local state
+ getMaintenanceData()
+ })
+ .subscribe()
 ```
 
 ### 2. Role-Based Access Control (RBAC)
