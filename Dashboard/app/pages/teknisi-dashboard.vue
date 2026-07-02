@@ -26,6 +26,11 @@ const loading = ref(false)
 const errorMsg = ref(null)
 const uploadingDetails = ref({})
 
+// Evidence Modal state
+const evidenceModalOpen = ref(false)
+const evidenceLoading = ref(false)
+const evidencePhotos = ref([])
+
 async function logout() {
   await supabase.auth.signOut()
   roleState.value = null
@@ -148,6 +153,33 @@ async function markAsCompleted(record) {
     errorMsg.value = error.message
   } finally {
     loading.value = false
+  }
+}
+
+async function openEvidenceModal(record) {
+  evidencePhotos.value = []
+  evidenceModalOpen.value = true
+  evidenceLoading.value = true
+
+  try {
+    const detailIds = record.maintenance_detail?.map(d => d.id) || []
+    if (detailIds.length === 0) {
+      evidencePhotos.value = []
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('maintenance_photos')
+      .select('photo_url')
+      .in('maintenance_detail_id', detailIds)
+
+    if (error) throw error
+    evidencePhotos.value = data || []
+  } catch (error) {
+    console.error('[openEvidenceModal] catch:', error)
+    evidencePhotos.value = []
+  } finally {
+    evidenceLoading.value = false
   }
 }
 
@@ -290,30 +322,20 @@ onMounted(() => {
                   </p>
                 </div>
                 <div class="flex flex-col sm:flex-row flex-wrap items-end justify-end gap-sm w-full sm:w-auto">
-                  <a 
-                    v-for="photo in detail.maintenance_photos" 
-                    :key="photo.id" 
-                    :href="photo.photo_url" 
-                    target="_blank" 
-                    class="flex items-center gap-xs px-sm py-1 text-[11px] font-label-bold text-primary bg-primary-container/30 border border-primary/20 rounded hover:bg-primary-container/50 transition-colors w-full sm:w-auto justify-center"
-                  >
-                    <span class="material-symbols-outlined text-[14px]">image</span>
-                    Lihat Foto
-                  </a>
-                  <div class="relative w-full sm:w-auto">
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      @change="handleFileUpload(record.id, detail.id, $event)"
-                      class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      :disabled="uploadingDetails[detail.id]"
-                    />
-                    <button :class="['flex items-center justify-center gap-xs px-sm py-1 text-[11px] font-label-bold border rounded transition-colors w-full', uploadingDetails[detail.id] ? 'text-secondary bg-surface-variant border-outline-variant cursor-wait' : 'text-primary bg-primary-container/30 border-primary/20 hover:bg-primary-container/50']">
-                      <span v-if="uploadingDetails[detail.id]" class="material-symbols-outlined text-[14px] animate-spin">autorenew</span>
-                      <span v-else class="material-symbols-outlined text-[14px]">upload_file</span>
-                      Upload Bukti
-                    </button>
-                  </div>
+                <div class="relative w-full sm:w-auto">
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  @change="handleFileUpload(record.id, detail.id, $event)"
+                  class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    :disabled="uploadingDetails[detail.id]"
+                />
+                <button :class="['flex items-center justify-center gap-xs px-sm py-1 text-[11px] font-label-bold border rounded transition-colors w-full', uploadingDetails[detail.id] ? 'text-secondary bg-surface-variant border-outline-variant cursor-wait' : 'text-primary bg-primary-container/30 border-primary/20 hover:bg-primary-container/50']">
+                    <span v-if="uploadingDetails[detail.id]" class="material-symbols-outlined text-[14px] animate-spin">autorenew</span>
+                    <span v-else class="material-symbols-outlined text-[14px]">upload_file</span>
+                  Upload Bukti
+                </button>
+                </div>
                 </div>
               </div>
             </div>
@@ -322,19 +344,56 @@ onMounted(() => {
             </div>
 
             <!-- Action Footer -->
-            <div class="flex justify-end pt-md border-t border-surface-variant">
-              <button v-if="!record.status" @click="markAsCompleted(record)" class="flex items-center gap-sm px-lg py-sm bg-primary text-white rounded-lg font-label-bold hover:bg-primary/90 transition-all">
-                <span class="material-symbols-outlined text-[18px]">check_circle</span>
-                Selesaikan Tugas
-              </button>
-              <button v-else disabled class="flex items-center gap-sm px-lg py-sm bg-surface-variant text-on-surface-variant rounded-lg font-label-bold opacity-70 cursor-not-allowed">
-                <span class="material-symbols-outlined text-[18px]">task_alt</span>
-                Tugas Selesai
-              </button>
-            </div>
+            <div class="flex justify-end pt-md border-t border-surface-variant gap-2">
+            <UButton
+            size="xs"
+            color="neutral"
+              variant="soft"
+              icon="i-heroicons-photo"
+            @click="openEvidenceModal(record)"
+            >
+              lihat bukti
+              </UButton>
+               <button v-if="!record.status" @click="markAsCompleted(record)" class="flex items-center gap-sm px-lg py-sm bg-primary text-white rounded-lg font-label-bold hover:bg-primary/90 transition-all">
+                 <span class="material-symbols-outlined text-[18px]">check_circle</span>
+                 Selesaikan Tugas
+               </button>
+               <button v-else disabled class="flex items-center gap-sm px-lg py-sm bg-surface-variant text-on-surface-variant rounded-lg font-label-bold opacity-70 cursor-not-allowed">
+                 <span class="material-symbols-outlined text-[18px]">task_alt</span>
+                 Tugas Selesai
+               </button>
+             </div>
           </div>
         </div>
       </div>
     </div>
   </main>
+
+    <!-- Evidence Modal -->
+    <UModal v-model:open="evidenceModalOpen" title="Bukti Maintenance" description="View all photos related to this maintenance record." :ui="{ content: 'sm:max-w-3xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-3xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
+      <template #body>
+        <div v-if="evidenceLoading" class="flex flex-col items-center justify-center py-12 text-secondary">
+          <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin mb-2" />
+          <p class="text-sm">Loading images...</p>
+        </div>
+        <div v-else-if="evidencePhotos.length === 0" class="flex flex-col items-center justify-center py-12 text-secondary">
+          <UIcon name="i-heroicons-photo" class="w-8 h-8 mb-2 opacity-50" />
+          <p class="text-sm">Tidak ada bukti foto tersedia.</p>
+        </div>
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <div v-for="(photo, index) in evidencePhotos" :key="index" class="aspect-square rounded-xl overflow-hidden border border-surface-variant group relative">
+            <img 
+              :src="photo.photo_url" 
+              class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end w-full">
+          <UButton label="Close" color="neutral" variant="soft" @click="evidenceModalOpen = false" />
+        </div>
+      </template>
+    </UModal>
 </template>
