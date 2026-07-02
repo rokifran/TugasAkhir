@@ -170,7 +170,7 @@ async function openEvidenceModal(record) {
 
     const { data, error } = await supabase
       .from('maintenance_photos')
-      .select('photo_url')
+      .select('id, photo_url')
       .in('maintenance_detail_id', detailIds)
 
     if (error) throw error
@@ -180,6 +180,88 @@ async function openEvidenceModal(record) {
     evidencePhotos.value = []
   } finally {
     evidenceLoading.value = false
+  }
+}
+
+const fullscreenPhoto = ref(null)
+const fullscreenOpen = ref(false)
+
+function openFullscreen(photoUrl) {
+  fullscreenPhoto.value = photoUrl
+  fullscreenOpen.value = true
+  // Tutup sementara modal bukti agar Focus Trap tidak mencegat event klik pada fullscreen preview
+  evidenceModalOpen.value = false
+}
+
+function closeFullscreen() {
+  fullscreenPhoto.value = null
+  fullscreenOpen.value = false
+  // Buka kembali modal bukti setelah menutup fullscreen preview
+  evidenceModalOpen.value = true
+}
+
+async function deletePhoto(photoId, photoUrl) {
+  if (!confirm('Apakah Anda yakin ingin menghapus foto ini?')) {
+    return
+  }
+  
+  try {
+    // 1. Delete from database first, adding .select() to verify if it actually deleted a row
+    const { data: deletedData, error: dbError } = await supabase
+      .from('maintenance_photos')
+      .delete()
+      .eq('id', photoId)
+      .select()
+      
+    if (dbError) throw dbError
+    
+    // Supabase silently returns success with 0 rows if RLS blocks the delete
+    if (!deletedData || deletedData.length === 0) {
+      throw new Error('Gagal menghapus data dari database. Pastikan RLS (Row Level Security) untuk DELETE diizinkan.')
+    }
+    
+    // 2. Extract file path from URL (ignore query parameters and hash)
+    const urlObj = new URL(photoUrl)
+    const pathname = decodeURIComponent(urlObj.pathname) // e.g., /storage/v1/object/public/maintenance-photos/...
+    
+    // Find the part after the bucket name
+    const pathParts = pathname.split('/')
+    const bucketIndex = pathParts.indexOf('maintenance-photos')
+    if (bucketIndex === -1) {
+      throw new Error('Invalid photo URL: bucket not found')
+    }
+    const filePath = pathParts.slice(bucketIndex + 1).join('/')
+    
+    // 3. Delete from Supabase storage
+    const { data: storageData, error: storageError } = await supabase.storage
+      .from('maintenance-photos')
+      .remove([filePath])
+    
+    if (storageError) throw storageError
+    
+    if (!storageData || storageData.length === 0) {
+      console.warn('File storage mungkin sudah tidak ada atau terblokir RLS Storage')
+    }
+    
+    // 4. Remove from local modal state
+    evidencePhotos.value = evidencePhotos.value.filter(photo => photo.id !== photoId)
+    
+    // 5. Refresh main maintenance data to ensure dashboard state is synced
+    await fetchMaintenanceData()
+    
+    toast.add({
+      title: 'Berhasil',
+      description: 'Foto dan data terkait berhasil dihapus',
+      color: 'green'
+    })
+    
+  } catch (error) {
+    console.error('[deletePhoto] error:', error)
+    toast.add({
+      title: 'Gagal Menghapus',
+      description: error.message || 'Terjadi kesalahan saat menghapus foto',
+      color: 'red'
+    })
   }
 }
 
@@ -271,13 +353,13 @@ onMounted(() => {
                 <div class="flex items-center gap-sm mb-1">
                   <h4 class="font-headline-md text-[16px] text-on-surface">{{ record.client?.nama || 'Client Tidak Dikenal' }}</h4>
                   <span v-if="record.status" class="inline-flex items-center px-sm py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-label-bold border border-emerald-200 uppercase tracking-tighter">
-                    <span class="w-1 h-1 rounded-full bg-emerald-500 mr-1.5"></span>
-                    Completed
-                  </span>
-                  <span v-else class="inline-flex items-center px-sm py-1 rounded-full bg-amber-50 text-amber-700 text-[10px] font-label-bold border border-amber-200 uppercase tracking-tighter">
-                    <span class="w-1 h-1 rounded-full bg-amber-500 mr-1.5"></span>
-                    Pending
-                  </span>
+                      <span class="w-1 h-1 rounded-full bg-emerald-500 mr-1.5"></span>
+                      Completed
+                    </span>
+                    <span v-else class="inline-flex items-center px-sm py-1 rounded-full bg-amber-50 text-amber-700 text-[10px] font-label-bold border border-amber-200 uppercase tracking-tighter">
+                      <span class="w-1 h-1 rounded-full bg-amber-500 mr-1.5"></span>
+                      Pending
+                    </span>
                 </div>
                 <div class="flex flex-wrap items-center gap-md text-secondary text-[12px]">
                   <span class="flex items-center gap-xs">
@@ -315,10 +397,10 @@ onMounted(() => {
                 
                 <div class="pl-2">
                   <p class="font-label-bold text-on-surface text-[14px]">
-                    {{ detail.kategori_perangkat?.kategori }} - {{ detail.kategori_perangkat?.nama_perangkat }}
+                      {{ detail.kategori_perangkat?.kategori }} - {{ detail.kategori_perangkat?.nama_perangkat }}
                   </p>
                   <p v-if="detail.catatan_kerusakan" class="text-secondary text-[12px] italic mt-1">
-                    "{{ detail.catatan_kerusakan }}"
+                      "{{ detail.catatan_kerusakan }}"
                   </p>
                 </div>
                 <div class="flex flex-col sm:flex-row flex-wrap items-end justify-end gap-sm w-full sm:w-auto">
@@ -354,20 +436,20 @@ onMounted(() => {
             >
               lihat bukti
               </UButton>
-               <button v-if="!record.status" @click="markAsCompleted(record)" class="flex items-center gap-sm px-lg py-sm bg-primary text-white rounded-lg font-label-bold hover:bg-primary/90 transition-all">
-                 <span class="material-symbols-outlined text-[18px]">check_circle</span>
-                 Selesaikan Tugas
-               </button>
-               <button v-else disabled class="flex items-center gap-sm px-lg py-sm bg-surface-variant text-on-surface-variant rounded-lg font-label-bold opacity-70 cursor-not-allowed">
-                 <span class="material-symbols-outlined text-[18px]">task_alt</span>
-                 Tugas Selesai
-               </button>
-             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </main>
+               <button v-if="!record.status" @click="markAsCompleted(record)" class="flex items-center gap-sm px-lg py-sm bg-primary text-white dark:text-black rounded-lg font-label-bold hover:bg-primary/90 transition-all">
+                  <span class="material-symbols-outlined text-[18px]">check_circle</span>
+                  Selesaikan Tugas
+                </button>
+                <button v-else disabled class="flex items-center gap-sm px-lg py-sm bg-surface-variant text-on-surface-variant rounded-lg font-label-bold opacity-70 cursor-not-allowed">
+                  <span class="material-symbols-outlined text-[18px]">task_alt</span>
+                  Tugas Selesai
+                </button>
+              </div>
+           </div>
+         </div>
+       </div>
+     </div>
+   </main>
 
     <!-- Evidence Modal -->
     <UModal v-model:open="evidenceModalOpen" title="Bukti Maintenance" description="View all photos related to this maintenance record." :ui="{ content: 'sm:max-w-3xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-3xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
@@ -381,12 +463,21 @@ onMounted(() => {
           <p class="text-sm">Tidak ada bukti foto tersedia.</p>
         </div>
         <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          <div v-for="(photo, index) in evidencePhotos" :key="index" class="aspect-square rounded-xl overflow-hidden border border-surface-variant group relative">
+          <div v-for="(photo, index) in evidencePhotos" :key="index" class="aspect-square rounded-xl overflow-hidden border border-surface-variant group relative cursor-pointer">
             <img 
               :src="photo.photo_url" 
               class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"
+              @click="openFullscreen(photo.photo_url)"
             />
+            <!-- Delete Button Overlay -->
+            <button 
+              @click.stop="deletePhoto(photo.id, photo.photo_url)"
+              class="absolute top-2 right-2 bg-red-500 bg-opacity-70 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+              aria-label="Hapus foto"
+            >
+              <span class="material-symbols-outlined text-[18px]">delete</span>
+            </button>
           </div>
         </div>
       </template>
@@ -396,4 +487,39 @@ onMounted(() => {
         </div>
       </template>
     </UModal>
+
+    <!-- Fullscreen Modal -->
+    <!-- Fullscreen Modal -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-300 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div 
+          v-if="fullscreenOpen" 
+          class="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[9999] cursor-zoom-out"
+          @click="closeFullscreen"
+        >
+          <div class="relative w-[90vw] h-[90vh] max-w-[800px] max-h-[800px]" @click.stop>
+            <img 
+              :src="fullscreenPhoto" 
+              class="w-full h-full object-contain cursor-zoom-out"
+              @click="closeFullscreen"
+            />
+            <!-- Close Button -->
+            <button 
+              @click="closeFullscreen"
+              class="absolute top-2 right-2 bg-white bg-opacity-80 rounded-full w-10 h-10 flex items-center justify-center text-black hover:bg-white transition-colors cursor-pointer z-50"
+              aria-label="Tutup layar penuh"
+            >
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 </template>

@@ -39,6 +39,10 @@ const evidenceModalOpen = ref(false)
 const evidenceLoading = ref(false)
 const evidencePhotos = ref([])
 
+// Fullscreen Modal state
+const fullscreenPhoto = ref(null)
+const fullscreenOpen = ref(false)
+
 // Form fields (shared between insert & edit)
 const formTeknisi = ref(null)
 const formClient = ref(null)
@@ -375,6 +379,20 @@ async function openEvidenceModal(record) {
   } finally {
     evidenceLoading.value = false
   }
+}
+
+function openFullscreen(photoUrl) {
+  fullscreenPhoto.value = photoUrl
+  fullscreenOpen.value = true
+  // Tutup sementara modal bukti agar Focus Trap tidak mencegat event klik pada fullscreen preview
+  evidenceModalOpen.value = false
+}
+
+function closeFullscreen() {
+  fullscreenPhoto.value = null
+  fullscreenOpen.value = false
+  // Buka kembali modal bukti setelah menutup fullscreen preview
+  evidenceModalOpen.value = true
 }
 
 // Helper methods for devices form
@@ -768,11 +786,12 @@ watch(user, (newUser) => {
           <p class="text-sm">Tidak ada bukti foto tersedia.</p>
         </div>
         <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          <div v-for="(photo, index) in evidencePhotos" :key="index" class="aspect-square rounded-xl overflow-hidden border border-surface-variant group relative">
+          <div v-for="(photo, index) in evidencePhotos" :key="index" class="aspect-square rounded-xl overflow-hidden border border-surface-variant group relative cursor-pointer">
             <img 
               :src="photo.photo_url" 
               class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"
+              @click="openFullscreen(photo.photo_url)"
             />
           </div>
         </div>
@@ -1039,5 +1058,39 @@ watch(user, (newUser) => {
         </div>
       </template>
     </UModal>
+
+    <!-- Fullscreen Modal -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-300 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div 
+          v-if="fullscreenOpen" 
+          class="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[9999] cursor-zoom-out"
+          @click="closeFullscreen"
+        >
+          <div class="relative w-[90vw] h-[90vh] max-w-[800px] max-h-[800px]" @click.stop>
+            <img 
+              :src="fullscreenPhoto" 
+              class="w-full h-full object-contain cursor-zoom-out"
+              @click="closeFullscreen"
+            />
+            <!-- Close Button -->
+            <button 
+              @click="closeFullscreen"
+              class="absolute top-2 right-2 bg-white bg-opacity-80 rounded-full w-10 h-10 flex items-center justify-center text-black hover:bg-white transition-colors cursor-pointer z-50"
+              aria-label="Tutup layar penuh"
+            >
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </main>
 </template>
