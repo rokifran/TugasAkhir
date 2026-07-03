@@ -104,7 +104,13 @@ async function sendMaintenanceReminders() {
             .select(`
                 kode_lokasi,
                 teknisi (
+                    nama,
                     kontak
+                ),
+                maintenance_detail (
+                    kategori_perangkat (
+                        nama_perangkat
+                    )
                 )
             `)
             .eq('tanggal_maintenance', today)
@@ -126,8 +132,15 @@ async function sendMaintenanceReminders() {
                 continue;
             }
 
+            const details = job.maintenance_detail || [];
+            const deviceNames = details
+                .map(d => d.kategori_perangkat?.nama_perangkat)
+                .filter(Boolean);
+            const devicesStr = deviceNames.length > 0 ? deviceNames.join(', ') : 'Tidak ada perangkat';
+            const techName = job.teknisi?.nama || 'Teknisi';
+
             const chatId = formatPhoneNumber(contact);
-            const message = `Dont forget there is a maintenance today on ${job.kode_lokasi}`;
+            const message = `Halo ${techName}, jangan lupa ada maintenance hari ini di ${job.kode_lokasi} untuk perangkat: ${devicesStr}.`;
 
             await safeSendMessage(chatId, message, `technician ${contact}`);
         }
@@ -150,8 +163,14 @@ async function sendTomorrowMaintenanceReminders() {
             .from('maintenance')
             .select(`
                 kode_lokasi,
-                teknisi ( kontak ),
-                client ( kontak ),
+                teknisi ( 
+                    nama,
+                    kontak 
+                ),
+                client ( 
+                    nama,
+                    kontak 
+                ),
                 maintenance_detail (
                     kategori_perangkat ( nama_perangkat )
                 )
@@ -179,16 +198,18 @@ async function sendTomorrowMaintenanceReminders() {
             // Send to Technician
             const techContact = job.teknisi?.kontak;
             if (techContact) {
+                const techName = job.teknisi?.nama || 'Teknisi';
                 const techChatId = formatPhoneNumber(techContact);
-                const techMessage = `Jangan lupa ada maintenance besok di ${job.kode_lokasi} untuk perbaikan perangkat: ${devicesStr}.`;
+                const techMessage = `Halo ${techName}, jangan lupa ada maintenance besok di ${job.kode_lokasi} untuk perangkat: ${devicesStr}.`;
                 await safeSendMessage(techChatId, techMessage, `technician ${techContact}`);
             }
 
             // Send to Client
             const clientContact = job.client?.kontak;
             if (clientContact) {
+                const clientName = job.client?.nama || 'Client';
                 const clientChatId = formatPhoneNumber(clientContact);
-                const clientMessage = `Dont forget there is a maintenance tomorow`;
+                const clientMessage = `Halo ${clientName}, kami menginformasikan bahwa akan ada jadwal maintenance besok di lokasi Anda. Mohon kesediaannya.`;
                 await safeSendMessage(clientChatId, clientMessage, `client ${clientContact}`);
             }
         }
