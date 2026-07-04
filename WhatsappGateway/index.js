@@ -225,3 +225,10 @@ client.on('message', msg => {
 });
 
 client.initialize();
+
+module.exports = {
+    formatPhoneNumber,
+    safeSendMessage,
+    sendMaintenanceReminders,
+    sendTomorrowMaintenanceReminders
+};
