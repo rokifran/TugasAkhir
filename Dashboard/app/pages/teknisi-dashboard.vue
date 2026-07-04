@@ -75,64 +75,140 @@ async function fetchMaintenanceData() {
   }
 }
 
+async function compressImage(file, quality = 0.8) {
+  const MAX_SIZE = 500 * 1024 // 500KB
+  const MAX_WIDTH = 1920
+  const MAX_HEIGHT = 1080
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = (event) => {
+      const img = new Image()
+      img.src = event.target.result
+      img.onload = async () => {
+        let width = img.width
+        let height = img.height
+
+        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+          if (width > height) {
+            height = Math.round((height * MAX_WIDTH) / width)
+            width = MAX_WIDTH
+          } else {
+            width = Math.round((width * MAX_HEIGHT) / height)
+            height = MAX_HEIGHT
+          }
+        }
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, width, height)
+
+        const processBlob = (q) => {
+          return new Promise((resolveBlob) => {
+            canvas.toBlob((blob) => resolveBlob(blob), 'image/jpeg', q)
+          })
+        }
+
+        let currentQuality = quality
+        let blob = await processBlob(currentQuality)
+
+        while (blob.size > MAX_SIZE && currentQuality > 0.1) {
+          currentQuality -= 0.1
+          blob = await processBlob(currentQuality)
+        }
+
+        resolve(blob)
+      }
+      img.onerror = () => reject(new Error('Gagal memuat gambar untuk kompresi'))
+    }
+    reader.onerror = () => reject(new Error('Gagal membaca file gambar'))
+  })
+}
+
 async function handleFileUpload(maintenanceId, detailId, event) {
-  const file = event.target.files[0]
-  if (!file) return
+
+  const files = Array.from(event.target.files)
+  if (files.length === 0) return
 
   errorMsg.value = null
-
-  // File Validation
-  const maxSize = 5 * 1024 * 1024 // 5MB
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
-
-  if (file.size > maxSize) {
-    errorMsg.value = 'Ukuran file terlalu besar. Maksimal 5MB.'
-    return
-  }
-
-  if (!allowedTypes.includes(file.type)) {
-    errorMsg.value = 'Tipe file tidak didukung. Gunakan JPEG, PNG, atau WebP.'
-    return
-  }
-
   uploadingDetails.value[detailId] = true
 
+  const maxSize = 5 * 1024 * 1024 // 5MB
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+  
+  let successCount = 0
+  let failureCount = 0
+
   try {
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${maintenanceId}-${detailId}-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`
-    const filePath = `photos/${fileName}`
+    for (const file of files) {
+      try {
+        // File Validation
+        if (!allowedTypes.includes(file.type)) {
+          throw new Error(`File ${file.name} tipe tidak didukung`)
+        }
+        if (file.size > maxSize) {
+          throw new Error(`File ${file.name} terlalu besar (Maks 5MB)`)
+        }
 
-    const { error: uploadError } = await supabase.storage
-      .from('maintenance-photos')
-      .upload(filePath, file)
+        // Image Compression
+        let uploadBlob = file
+        try {
+          uploadBlob = await compressImage(file)
+        } catch (compError) {
+          throw new Error(`Gagal mengompres gambar ${file.name}: ${compError.message}`)
+        }
 
-    if (uploadError) throw uploadError
+        const fileName = `${maintenanceId}-${detailId}-${Math.random().toString(36).substring(2)}-${Date.now()}-${successCount + failureCount}.jpg`
+        const filePath = `photos/${fileName}`
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('maintenance-photos')
-      .getPublicUrl(filePath)
+        // Upload to Storage
+        const { error: uploadError } = await supabase.storage
+          .from('maintenance-photos')
+          .upload(filePath, uploadBlob)
 
-    const { error: updateError } = await supabase
-      .from('maintenance_photos')
-      .insert({ maintenance_detail_id: detailId, photo_url: publicUrl })
+        if (uploadError) throw uploadError
 
-    if (updateError) throw updateError
 
-    toast.add({
-      title: 'Berhasil',
-      description: 'Bukti foto berhasil diunggah',
-      color: 'green'
-    })
-    await fetchMaintenanceData()
-  } catch (error) {
-    errorMsg.value = error.message
-    toast.add({
-      title: 'Gagal Unggah',
-      description: error.message,
-      color: 'red'
-    })
+        const { data: { publicUrl } } = supabase.storage
+          .from('maintenance-photos')
+          .getPublicUrl(filePath)
+
+        // Insert to DB
+        const { error: updateError } = await supabase
+          .from('maintenance_photos')
+          .insert({ maintenance_detail_id: detailId, photo_url: publicUrl })
+
+        if (updateError) throw updateError
+        
+        successCount++
+      } catch (fileError) {
+        console.error(`Error uploading ${file.name}:`, fileError)
+        failureCount++
+        toast.add({
+          title: 'Gagal Unggah',
+          description: fileError.message,
+          color: 'red'
+        })
+      }
+    }
+
+    if (successCount > 0) {
+      toast.add({
+        title: 'Berhasil',
+        description: `${successCount} bukti foto berhasil diunggah`,
+        color: 'green'
+      })
+      await fetchMaintenanceData()
+    }
+  } catch (globalError) {
+    errorMsg.value = globalError.message
   } finally {
     uploadingDetails.value[detailId] = false
+    // Reset input value so same files can be selected again if needed
+    event.target.value = ''
   }
 }
 
@@ -408,6 +484,7 @@ onMounted(() => {
                 <input 
                   type="file" 
                   accept="image/*" 
+                  multiple
                   @change="handleFileUpload(record.id, detail.id, $event)"
                   class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                     :disabled="uploadingDetails[detail.id]"
