@@ -36,7 +36,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
         console.error('Error fetching role:', error)
         fetchError = error.message
       } else if (data) {
-        roleState.value = data.role
+        roleState.value = (data as { role: string }).role
       }
     } catch (err) {
       console.error('Exception fetching role:', err)

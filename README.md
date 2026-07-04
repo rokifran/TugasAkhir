@@ -1,162 +1,205 @@
-# 🚀 MaintenApp - Technical Documentation
+# 🚀 MaintenApp - Dokumentasi Teknis
 
-This document provides a technical overview of the **MaintenApp** project, intended for developers looking to understand the architecture, data model, and workflows.
-
----
-
-## 🛠 Tech Stack
-
-- **Frontend Framework:** [Nuxt.js](https://nuxt.com/) (Vue.js)
-- **Backend-as-a-Service (BaaS):** [Supabase](https://supabase.com/)
- - **Database:** PostgreSQL
- - **Authentication:** Supabase Auth
- - **Realtime:** Supabase Realtime (Postgres Changes)
- - **Storage:** Supabase Storage (for maintenance proof photos)
-- **Notifications:** WhatsApp API Integration (via `WhatsappFonnte` or `WhatsappGateway`)
-- **Styling:** Tailwind CSS & Nuxt UI
+Dokumen ini memberikan gambaran teknis dari proyek **MaintenApp**, yang dirancang untuk membantu pengembang (terutama junior) dalam memahami arsitektur, model data, dan alur kerja sistem.
 
 ---
 
-## 🏗 System Architecture
+## 🛠 Tech Stack (Teknologi yang Digunakan)
 
-The application follows a modern, decoupled architecture:
+Kami menggunakan kombinasi teknologi modern untuk memastikan aplikasi cepat, responsif, dan mudah dikelola:
 
-1. **Client Layer (Nuxt.js):** A single-page application (SPA) that handles the UI for both Admins and Technicians. It interacts directly with Supabase via the Supabase Client SDK.
-2. **Backend Layer (Supabase):** Acts as the central engine, handling database management, user authentication, file storage, and real-time data synchronization.
-3. **Integration Layer (WhatsApp Gateway):** A service that listens for specific events (or is triggered by application logic) to send automated WhatsApp notifications to technicians and clients.
+- **Frontend Framework:** [Nuxt.js](https://nuxt.com/) (Vue.js) — Digunakan untuk membangun antarmuka pengguna (UI) yang cepat.
+- **Backend-as-a-Service (BaaS):** [Supabase](https://supabase.com/) — Mengelola infrastruktur backend tanpa perlu membuat server manual.
+  - **Database:** PostgreSQL (Database relasional untuk menyimpan data).
+  - **Authentication:** Supabase Auth (Sistem login dan keamanan pengguna).
+  - **Realtime:** Supabase Realtime (Sinkronisasi data otomatis secara langsung).
+  - **Storage:** Supabase Storage (Tempat menyimpan foto bukti pemeliharaan).
+- **Notifikasi:** WhatsApp API Integration (Melalui `WhatsappGateway`) — Mengirim pengingat otomatis ke teknisi dan klien.
+- **Styling:** Tailwind CSS & Nuxt UI — Untuk desain antarmuka yang konsisten dan modern.
 
-### High-Level Data Flow
+---
 
+## 🏗 Arsitektur Sistem (Detailed)
+
+Aplikasi ini menggunakan arsitektur terpisah (*decoupled*) dengan pembagian tanggung jawab yang jelas antara UI, Database, dan Background Service.
+
+### Diagram Arsitektur Detail
 ```mermaid
-graph TD
- Admin[Admin / Boss] -->|1. Create Task| Dashboard[Nuxt Dashboard]
- Dashboard -->|2. Save| DB[(Supabase Database)]
- DB -->|3. Trigger| WA[WhatsApp Gateway]
- WA -->|4. Notify| Tech[Technician / Worker]
- Tech -->|5. Update Status| TechDash[Technician Dashboard]
- TechDash -->|6. Update| DB
- DB -.->|7. Real-time Sync| Dashboard
+graph TB
+    subgraph "Client Side (Nuxt.js)"
+        AdminUI[Admin Dashboard]
+        TechUI[Technician Dashboard]
+        AuthMiddleware[Auth Middleware]
+    end
+
+    subgraph "Backend Side (Supabase)"
+        direction TB
+        Auth[Supabase Auth]
+        DB[(PostgreSQL Database)]
+        Storage[Supabase Storage]
+        Realtime[Realtime Engine]
+        RLS[Row Level Security]
+    end
+
+    subgraph "Integration Side (Node.js)"
+        WAGateway[WhatsApp Gateway Service]
+        CronJob[Node-Cron Scheduler]
+        WAPuppeteer[Puppeteer/WA-Web.js]
+    end
+
+    %% Flows
+    AdminUI -->|1. Auth/Login| Auth
+    TechUI -->|1. Auth/Login| Auth
+    
+    AdminUI -->|2. CRUD Tasks| RLS
+    TechUI -->|2. Update Status| RLS
+    RLS -->|3. Access Control| DB
+    
+    AdminUI -->|4. Upload Proof| Storage
+    TechUI -->|4. Upload Proof| Storage
+    
+    DB -->|5. Change Events| Realtime
+    Realtime -->|6. Push Update| AdminUI
+    
+    CronJob -->|7. Trigger Check| WAGateway
+    WAGateway -->|8. Query Schedule| DB
+    DB -->|9. Return Job List| WAGateway
+    WAGateway -->|10. Send Message| WAPuppeteer
+    WAPuppeteer -->|11. WhatsApp Message| TechUI
+    WAPuppeteer -->|11. WhatsApp Message| ClientUser[Klien/Customer]
 ```
 
 ---
 
-## 🗄️ Database Schema (ERD Overview)
+## 🔄 Alur Data (Detailed Data Flow)
 
-The database is relational and designed to support complex maintenance scheduling.
+Proses pengolahan data dalam MaintenApp terbagi menjadi dua aliran utama: Alur Pengelolaan Tugas dan Alur Notifikasi Otomatis.
 
-### Entity Relationship Diagram
+### 1. Alur Pengelolaan Tugas (Task Management Flow)
+Alur ini terjadi ketika Admin mengelola jadwal dan Teknisi mengupdate pengerjaan.
 
+```mermaid
+sequenceDiagram
+    participant Admin as Admin (UI)
+    participant Supa as Supabase (BaaS)
+    participant Real as Realtime Engine
+    participant Tech as Teknisi (UI)
+
+    Admin->>Supa: Buat Jadwal Maintenance (Insert)
+    Supa->>Supa: Simpan ke tabel `maintenance`
+    Supa-->>Real: Trigger: Postgres Change (INSERT)
+    Real-->>Admin: Notifikasi: "Tugas Baru Berhasil Dibuat"
+    
+    Tech->>Supa: Lihat Daftar Tugas (Select)
+    Supa-->>Tech: Kirim data tugas assigned
+    Tech->>Supa: Upload Foto & Update Status (UPDATE)
+    Supa->>Supa: Simpan status `completed: true`
+    Supa-->>Real: Trigger: Postgres Change (UPDATE)
+    Real-->>Admin: Notifikasi: "Tugas Selesai" (Auto-update UI)
+```
+
+### 2. Alur Notifikasi Otomatis (Automatic Notification Flow)
+Alur ini berjalan secara independen di latar belakang melalui Node.js.
+
+```mermaid
+sequenceDiagram
+    participant Cron as Node-Cron
+    participant Gateway as WhatsApp Gateway
+    participant DB as Supabase DB
+    participant WA as WhatsApp Web API
+    participant User as Teknisi/Klien
+
+    Cron->>Gateway: Trigger: Jam 03:00 / 08:00 AM
+    Gateway->>DB: Query: maintenance where status=false
+    DB-->>Gateway: Kirim data: [Job, Kontak Teknisi, Kontak Klien]
+    Gateway->>Gateway: Format Nomor (62...) & Susun Pesan
+    Gateway->>WA: Request: send_message(phone, message)
+    WA->>User: Terima Notifikasi WhatsApp
+```
+
+---
+
+## 🗄️ Skema Database (Detailed ERD)
+
+Database dirancang secara relasional untuk menjamin integritas data (*Data Integrity*).
+
+### Entity Relationship Diagram (ERD)
 ```mermaid
 erDiagram
- users ||--|| teknisi : "has profile"
- teknisi ||--o{ maintenance : "performs"
- client ||--o{ maintenance : "receives"
- maintenance ||--|{ maintenance_detail : "contains"
- kategori_perangkat ||--o{ maintenance_detail : "categorizes"
+    users ||--|| teknisi : "memiliki profil"
+    teknisi ||--o{ maintenance : "mengerjakan"
+    client ||--o{ maintenance : "menerima"
+    maintenance ||--|{ maintenance_detail : "berisi"
+    kategori_perangkat ||--o{ maintenance_detail : "dikategorikan sebagai"
 
- users {
- uuid id PK
- text email
- enum role
- }
- teknisi {
- uuid id PK, FK
- text nama
- text kontak
- text kode_lokasi
- }
- client {
- uuid id PK
- text nama
- text kontak
- }
- kategori_perangkat {
- uuid id PK
- text kategori
- text nama_perangkat
- }
- maintenance {
- uuid id PK
- uuid teknisi FK
- uuid client FK
- text kode_lokasi
- timestamp tanggal_maintenance
- boolean status
- }
- maintenance_detail {
- uuid id PK
- uuid maintenance_id FK
- uuid kategori_perangkat_id FK
- text catatan_kerusakan
- }
+    users {
+        uuid id PK "References auth.users"
+        text email "Unique email"
+        enum role "admin | teknisi"
+    }
+    teknisi {
+        uuid id PK, FK "References users.id"
+        text nama "Nama Lengkap"
+        text kontak "Nomor WhatsApp"
+        text kode_lokasi "Default Area"
+    }
+    client {
+        uuid id PK
+        text nama "Nama Perusahaan/Klien"
+        text kontak "Nomor WhatsApp"
+    }
+    kategori_perangkat {
+        uuid id PK
+        text kategori "Contoh: Hardware"
+        text nama_perangkat "Contoh: Printer"
+    }
+    maintenance {
+        uuid id PK
+        uuid teknisi FK "FK: teknisi.id"
+        uuid client FK "FK: client.id"
+        text kode_lokasi "Lokasi Pengerjaan"
+        timestamp tanggal_maintenance "Jadwal"
+        boolean status "false: Pending | true: Done"
+    }
+    maintenance_detail {
+        uuid id PK
+        uuid maintenance_id FK "FK: maintenance.id"
+        uuid kategori_perangkat_id FK "FK: kategori_perangkat.id"
+        text catatan_kerusakan "Detail masalah"
+    }
 ```
 
-### Core Tables Detail
-
-#### `users`
-Stores extended user profiles linked to Supabase Auth.
-- `id` (UUID, PK): References `auth.users.id`.
-- `email` (Text): User's email.
-- `role` (Enum): `admin` or `teknisi`.
-
-#### `teknisi`
-Profiles for technicians.
-- `id` (UUID, PK): References `users.id`.
-- `nama` (Text): Full name.
-- `kontak` (Text): WhatsApp number.
-- `kode_lokasi` (Text): Default working area.
-
-#### `client`
-Profiles for customers/companies.
-- `id` (UUID, PK).
-- `nama` (Text).
-- `kontak` (Text): WhatsApp number.
-
-#### `kategori_perangkat`
-Lookup table for device types.
-- `id` (UUID, PK).
-- `kategori` (Text): e.g., "Hardware".
-- `nama_perangkat` (Text): e.g., "Printer".
-
-#### `maintenance`
-The central transaction table for maintenance tasks.
-- `id` (UUID, PK).
-- `teknisi` (UUID, FK): References `teknisi.id`.
-- `client` (UUID, FK): References `client.id`.
-- `kode_lokasi` (Text).
-- `tanggal_maintenance` (Timestamp).
-- `status` (Boolean): `true` for Completed, `false` for Pending.
-
-#### `maintenance_detail`
-A child table of `maintenance` to support multiple devices per task (One-to-Many).
-- `id` (UUID, PK).
-- `maintenance_id` (UUID, FK): References `maintenance.id`.
-- `kategori_perangkat_id` (UUID, FK): References `kategori_perangkat.id`.
-- `catatan_kerusakan` (Text): Notes on the issue.
+### Relasi Kunci
+- **One-to-One (`users` $\rightarrow$ `teknisi`):** Setiap pengguna dengan role 'teknisi' memiliki satu profil detail teknisi.
+- **One-to-Many (`maintenance` $\rightarrow$ `maintenance_detail`):** Satu sesi maintenance bisa mencakup pemeriksaan banyak perangkat sekaligus.
+- **One-to-Many (`teknisi` $\rightarrow$ `maintenance`):** Seorang teknisi bisa menangani banyak tugas pemeliharaan.
 
 ---
 
-## 🔑 Key Implementation Details for Juniors
+## 🔑 Catatan Implementasi untuk Junior
 
-### 1. Real-time Subscriptions
-To ensure the Admin dashboard stays up-to-date, we use Supabase Realtime. In Nuxt components, you will typically see:
+### 1. Real-time Subscriptions (Supabase)
+Agar UI terupdate otomatis tanpa refresh, gunakan `channel`. Ini sangat krusial untuk aplikasi dashboard.
 ```javascript
+// Contoh listener untuk perubahan status maintenance
 supabase
- .channel('maintenance-changes')
- .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'maintenance' }, payload => {
- // Refresh data or update local state
- getMaintenanceData()
- })
- .subscribe()
+  .channel('maintenance-updates')
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'maintenance' }, payload => {
+    console.log('Data berubah!', payload.new)
+    refreshUI() // Fungsi untuk update data di layar
+  })
+  .subscribe()
 ```
 
-### 2. Role-Based Access Control (RBAC)
-Access is managed through a combination of:
-- **Frontend:** Middleware (`auth.global.ts`) checks the user's role and redirects them to the appropriate dashboard (`index.vue` for Admin, `teknisi-dashboard.vue` for Technician).
-- **Backend:** Supabase Row Level Security (RLS) policies should be used to ensure Technicians can only see/edit their assigned tasks, while Admins have full access.
+### 2. Keamanan dengan RLS (Row Level Security)
+Kita tidak hanya mengamankan frontend, tapi juga backend. Supabase RLS memastikan:
+- **Teknisi:** `SELECT` hanya jika `teknisi_id == auth.uid()`.
+- **Admin:** `ALL` access ke semua baris data.
 
-### 3. WhatsApp Integration
-The system relies on an external gateway. When a maintenance task is created or updated, the application logic (or a database trigger/edge function) sends a request to the WhatsApp API endpoint to dispatch the message.
+### 3. WhatsApp Gateway (Headless Browser)
+WhatsApp Gateway menggunakan Puppeteer yang menjalankan Chrome di latar belakang untuk mensimulasikan WhatsApp Web.
+- **Kelebihan:** Gratis (tidak bayar API resmi).
+- **Kekurangan:** Perlu menjaga sesi login tetap aktif (Session persistence).
 
 ---
-*Generated for the MaintenApp Development Team.*
+*Dokumentasi ini diperbarui untuk Tim Pengembangan MaintenApp.*
