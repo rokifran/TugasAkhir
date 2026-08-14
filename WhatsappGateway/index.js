@@ -3,6 +3,15 @@ const qrcode = require('qrcode-terminal');
 const cron = require('node-cron');
 const supabase = require('./supabase');
 
+(async () => {
+    const { error } = await supabase.from('teknisi').select('count', { count: 'exact', head: true });
+    if (error) {
+        console.error('Supabase connection error:', error.message);
+    } else {
+        console.log('Supabase connected successfully');
+    }
+})();
+
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -37,7 +46,7 @@ client.on('ready', async () => {
     });
 
     // Schedule task at 08:00 AM every day (Tomorrow's reminders)
-    cron.schedule('0 8 * * *', async () => {
+    cron.schedule('39 11 * * *', async () => {
         console.log('Running daily "tomorrow" reminder task at 08:00 AM...');
         await sendTomorrowMaintenanceReminders();
     }, {
