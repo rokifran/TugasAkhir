@@ -114,7 +114,7 @@ Set melalui Netlify Dashboard → Site settings → Environment variables:
 ## Database Setup
 
 1. Buka **Supabase Dashboard** → **SQL Editor**
-2. Jalankan perintah DDL dari [`@Docs/03-Skema-Database.md`](./@Docs/03-Skema-Database.md#34-sql-ddl-ringkasan) untuk membuat tabel
+2. Jalankan perintah DDL dari [`Docs/03-Skema-Database.md`](./Docs/03-Skema-Database.md#34-sql-ddl-ringkasan) untuk membuat tabel
 3. Aktifkan **Row Level Security** di setiap tabel
 4. Buat bucket storage `maintenance-photos` di Supabase Storage
 
@@ -351,16 +351,16 @@ curl -X POST http://localhost:3000/api/teknisi/create \
 
 ## Referensi Dokumentasi
 
-Dokumentasi teknis lengkap tersedia di folder [`@Docs/`](./@Docs/):
+Dokumentasi teknis lengkap tersedia di folder [`Docs/`](./Docs/):
 
 | File | Isi |
 |------|-----|
-| [`@Docs/01-Arsitektur-Sistem.md`](./@Docs/01-Arsitektur-Sistem.md) | Arsitektur sistem, diagram komponen, teknologi, struktur direktori |
-| [`@Docs/02-Cara-Kerja-Sistem.md`](./@Docs/02-Cara-Kerja-Sistem.md) | Alur bisnis: login, CRUD maintenance, dashboard teknisi, notifikasi |
-| [`@Docs/03-Skema-Database.md`](./@Docs/03-Skema-Database.md) | ERD, detail tabel, tipe data, indeks, SQL DDL lengkap |
-| [`@Docs/04-API-Endpoint-Dokumentasi.md`](./@Docs/04-API-Endpoint-Dokumentasi.md) | Server routes, client-side query patterns, integrasi eksternal |
-| [`@Docs/05-Keamanan-Manajemen-State.md`](./@Docs/05-Keamanan-Manajemen-State.md) | Autentikasi, RLS, state management, error handling, checklist keamanan |
-| [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md) | Skema database (referensi awal — konten sudah diintegrasikan ke `@Docs/03`) |
+| [`Docs/01-Arsitektur-Sistem.md`](./Docs/01-Arsitektur-Sistem.md) | Arsitektur sistem, diagram komponen, teknologi, struktur direktori |
+| [`Docs/02-Cara-Kerja-Sistem.md`](./Docs/02-Cara-Kerja-Sistem.md) | Alur bisnis: login, CRUD maintenance, dashboard teknisi, notifikasi |
+| [`Docs/03-Skema-Database.md`](./Docs/03-Skema-Database.md) | ERD, detail tabel, tipe data, indeks, SQL DDL lengkap |
+| [`Docs/04-API-Endpoint-Dokumentasi.md`](./Docs/04-API-Endpoint-Dokumentasi.md) | Server routes, client-side query patterns, integrasi eksternal |
+| [`Docs/05-Keamanan-Manajemen-State.md`](./Docs/05-Keamanan-Manajemen-State.md) | Autentikasi, RLS, state management, error handling, checklist keamanan |
+| [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md) | Skema database (referensi awal — konten sudah diintegrasikan ke `Docs/03`) |
 
 ---
 
