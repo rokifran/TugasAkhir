@@ -25,5 +25,9 @@
   },
   "overrides": {
     "ws": "^8.20.2"
+  },
+  "allowScripts": {
+    "puppeteer@24.38.0": true,
+    "unrs-resolver@1.12.2": true
   }
 }
