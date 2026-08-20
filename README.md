@@ -1,205 +1,367 @@
-# 🚀 MaintenApp - Dokumentasi Teknis
+# MaintenApp — Panduan Operasional
 
-Dokumen ini memberikan gambaran teknis dari proyek **MaintenApp**, yang dirancang untuk membantu pengembang (terutama junior) dalam memahami arsitektur, model data, dan alur kerja sistem.
+> **Versi:** 2.4.0 | **Stack:** Nuxt 4 + Supabase + WhatsApp Integration
 
----
-
-## 🛠 Tech Stack (Teknologi yang Digunakan)
-
-Kami menggunakan kombinasi teknologi modern untuk memastikan aplikasi cepat, responsif, dan mudah dikelola:
-
-- **Frontend Framework:** [Nuxt.js](https://nuxt.com/) (Vue.js) — Digunakan untuk membangun antarmuka pengguna (UI) yang cepat.
-- **Backend-as-a-Service (BaaS):** [Supabase](https://supabase.com/) — Mengelola infrastruktur backend tanpa perlu membuat server manual.
-  - **Database:** PostgreSQL (Database relasional untuk menyimpan data).
-  - **Authentication:** Supabase Auth (Sistem login dan keamanan pengguna).
-  - **Realtime:** Supabase Realtime (Sinkronisasi data otomatis secara langsung).
-  - **Storage:** Supabase Storage (Tempat menyimpan foto bukti pemeliharaan).
-- **Notifikasi:** WhatsApp API Integration (Melalui `WhatsappGateway`) — Mengirim pengingat otomatis ke teknisi dan klien.
-- **Styling:** Tailwind CSS & Nuxt UI — Untuk desain antarmuka yang konsisten dan modern.
+Panduan ini mencakup instalasi, konfigurasi, dan deployment **MaintenApp** — sistem manajemen maintenance dengan notifikasi WhatsApp otomatis.
 
 ---
 
-## 🏗 Arsitektur Sistem (Detailed)
+## Daftar Isi
 
-Aplikasi ini menggunakan arsitektur terpisah (*decoupled*) dengan pembagian tanggung jawab yang jelas antara UI, Database, dan Background Service.
+- [Prasyarat Sistem](#prasyarat-sistem)
+- [Struktur Proyek](#struktur-proyek)
+- [Konfigurasi Environment Variables](#konfigurasi-environment-variables)
+- [Menjalankan Dashboard (Nuxt)](#menjalankan-dashboard-nuxt)
+- [Menjalankan WhatsApp Gateway](#menjalankan-whatsapp-gateway)
+- [Deploy WhatsApp Fonnte (Netlify)](#deploy-whatsapp-fonnte-netlify)
+- [Deploy Dashboard ke Production](#deploy-dashboard-ke-production)
+- [Pembuatan User Awal](#pembuatan-user-awal)
+- [Referensi Dokumentasi](#referensi-dokumentasi)
 
-### Diagram Arsitektur Detail
-```mermaid
-graph TB
-    subgraph "Client Side (Nuxt.js)"
-        AdminUI[Admin Dashboard]
-        TechUI[Technician Dashboard]
-        AuthMiddleware[Auth Middleware]
-    end
+---
 
-    subgraph "Backend Side (Supabase)"
-        direction TB
-        Auth[Supabase Auth]
-        DB[(PostgreSQL Database)]
-        Storage[Supabase Storage]
-        Realtime[Realtime Engine]
-        RLS[Row Level Security]
-    end
+## Prasyarat Sistem
 
-    subgraph "Integration Side (Node.js)"
-        WAGateway[WhatsApp Gateway Service]
-        CronJob[Node-Cron Scheduler]
-        WAPuppeteer[Puppeteer/WA-Web.js]
-    end
+### Persyaratan Minimum
 
-    %% Flows
-    AdminUI -->|1. Auth/Login| Auth
-    TechUI -->|1. Auth/Login| Auth
-    
-    AdminUI -->|2. CRUD Tasks| RLS
-    TechUI -->|2. Update Status| RLS
-    RLS -->|3. Access Control| DB
-    
-    AdminUI -->|4. Upload Proof| Storage
-    TechUI -->|4. Upload Proof| Storage
-    
-    DB -->|5. Change Events| Realtime
-    Realtime -->|6. Push Update| AdminUI
-    
-    CronJob -->|7. Trigger Check| WAGateway
-    WAGateway -->|8. Query Schedule| DB
-    DB -->|9. Return Job List| WAGateway
-    WAGateway -->|10. Send Message| WAPuppeteer
-    WAPuppeteer -->|11. WhatsApp Message| TechUI
-    WAPuppeteer -->|11. WhatsApp Message| ClientUser[Klien/Customer]
+| Komponen | Spesifikasi |
+|----------|-------------|
+| **Node.js** | ≥ 18.x (direkomendasikan 22.x) |
+| **npm** | ≥ 9.x |
+| **OS** | Linux / macOS / WSL2 (Windows) |
+| **RAM** | ≥ 2 GB (untuk Puppeteer/WhatsApp Gateway) |
+| **Akun Supabase** | Gratis di [supabase.com](https://supabase.com) |
+
+### Catatan untuk WSL (Windows Subsystem for Linux)
+
+Jika menjalankan di WSL dengan working directory di `/mnt/...`:
+
+```bash
+# Hindari Exec format error (exit 126) akibat CRLF atau drvfs:
+# Gunakan --ignore-scripts untuk instalasi, lalu fix line endings
+npm install --ignore-scripts
+sed -i 's/\r$//' node_modules/.bin/*
+npm rebuild
+```
+
+> **Rekomendasi:** Salin project ke filesystem Linux native (`~/project/`) untuk performa terbaik.
+
+---
+
+## Struktur Proyek
+
+```
+TugasAkhir/
+├── @Docs/                          # Dokumentasi lengkap (lihat referensi)
+├── Dashboard/                      # Aplikasi Nuxt.js utama
+│   ├── app/                        # Source code Vue/Nuxt
+│   │   ├── pages/                  # Halaman aplikasi
+│   │   ├── layouts/                # Layout (sidebar + navbar)
+│   │   ├── middleware/              # Auth middleware
+│   │   └── app.vue                 # Root component
+│   ├── server/api/teknisi/         # Server routes (backend API)
+│   ├── nuxt.config.ts              # Konfigurasi Nuxt
+│   └── package.json                # Dependencies
+├── WhatsappGateway/                # Service notifikasi (Puppeteer)
+│   ├── index.js                    # Entry point + cron jobs
+│   └── package.json
+└── WhatsappFonnte/                 # Service notifikasi (Netlify)
+    ├── netlify/functions/          # Scheduled functions
+    └── package.json
 ```
 
 ---
 
-## 🔄 Alur Data (Detailed Data Flow)
+## Konfigurasi Environment Variables
 
-Proses pengolahan data dalam MaintenApp terbagi menjadi dua aliran utama: Alur Pengelolaan Tugas dan Alur Notifikasi Otomatis.
+### 1. Dashboard (`.env` di folder `Dashboard/`)
 
-### 1. Alur Pengelolaan Tugas (Task Management Flow)
-Alur ini terjadi ketika Admin mengelola jadwal dan Teknisi mengupdate pengerjaan.
+Buat file `Dashboard/.env`:
 
-```mermaid
-sequenceDiagram
-    participant Admin as Admin (UI)
-    participant Supa as Supabase (BaaS)
-    participant Real as Realtime Engine
-    participant Tech as Teknisi (UI)
-
-    Admin->>Supa: Buat Jadwal Maintenance (Insert)
-    Supa->>Supa: Simpan ke tabel `maintenance`
-    Supa-->>Real: Trigger: Postgres Change (INSERT)
-    Real-->>Admin: Notifikasi: "Tugas Baru Berhasil Dibuat"
-    
-    Tech->>Supa: Lihat Daftar Tugas (Select)
-    Supa-->>Tech: Kirim data tugas assigned
-    Tech->>Supa: Upload Foto & Update Status (UPDATE)
-    Supa->>Supa: Simpan status `completed: true`
-    Supa-->>Real: Trigger: Postgres Change (UPDATE)
-    Real-->>Admin: Notifikasi: "Tugas Selesai" (Auto-update UI)
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=eyJhbGciOiJIUzI1NiIs...your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs...your-service-role-key
 ```
 
-### 2. Alur Notifikasi Otomatis (Automatic Notification Flow)
-Alur ini berjalan secara independen di latar belakang melalui Node.js.
+Cara mendapatkan kunci dari Supabase Dashboard:
 
-```mermaid
-sequenceDiagram
-    participant Cron as Node-Cron
-    participant Gateway as WhatsApp Gateway
-    participant DB as Supabase DB
-    participant WA as WhatsApp Web API
-    participant User as Teknisi/Klien
+| Key | Lokasi di Supabase |
+|-----|--------------------|
+| `SUPABASE_URL` | Project Settings → API → Project URL |
+| `SUPABASE_KEY` | Project Settings → API → `anon` / `public` key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API → `service_role` key (**rahasia, jangan bocor ke client!**) |
 
-    Cron->>Gateway: Trigger: Jam 03:00 / 08:00 AM
-    Gateway->>DB: Query: maintenance where status=false
-    DB-->>Gateway: Kirim data: [Job, Kontak Teknisi, Kontak Klien]
-    Gateway->>Gateway: Format Nomor (62...) & Susun Pesan
-    Gateway->>WA: Request: send_message(phone, message)
-    WA->>User: Terima Notifikasi WhatsApp
+### 2. WhatsApp Gateway (`.env` di folder `WhatsappGateway/`)
+
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=eyJhbGciOiJIUzI1NiIs...your-anon-key
+```
+
+### 3. WhatsApp Fonnte (Environment Variables di Netlify)
+
+Set melalui Netlify Dashboard → Site settings → Environment variables:
+
+| Variable | Nilai |
+|----------|-------|
+| `SUPABASE_URL` | URL Supabase project |
+| `SUPABASE_KEY` | Anon key Supabase |
+| `FONNTE_TOKEN` | Token API dari [Fonnte.com](https://fonnte.com) |
+
+---
+
+## Database Setup
+
+1. Buka **Supabase Dashboard** → **SQL Editor**
+2. Jalankan perintah DDL dari [`@Docs/03-Skema-Database.md`](./@Docs/03-Skema-Database.md#34-sql-ddl-ringkasan) untuk membuat tabel
+3. Aktifkan **Row Level Security** di setiap tabel
+4. Buat bucket storage `maintenance-photos` di Supabase Storage
+
+---
+
+## Menjalankan Dashboard (Nuxt)
+
+### Development
+
+```bash
+cd Dashboard
+
+# Install dependencies
+npm install
+
+# Jalankan dev server (http://localhost:3000)
+npm run dev
+```
+
+### Testing
+
+```bash
+# Jalankan test suite
+npx vitest
+
+# Atau dengan coverage
+npx vitest --coverage
+```
+
+### Build & Preview
+
+```bash
+# Build untuk production
+npm run build
+
+# Preview hasil build
+npm run preview
 ```
 
 ---
 
-## 🗄️ Skema Database (Detailed ERD)
+## Menjalankan WhatsApp Gateway
 
-Database dirancang secara relasional untuk menjamin integritas data (*Data Integrity*).
+Service ini menggunakan **Puppeteer/Chrome** untuk mengontrol WhatsApp Web.
 
-### Entity Relationship Diagram (ERD)
-```mermaid
-erDiagram
-    users ||--|| teknisi : "memiliki profil"
-    teknisi ||--o{ maintenance : "mengerjakan"
-    client ||--o{ maintenance : "menerima"
-    maintenance ||--|{ maintenance_detail : "berisi"
-    kategori_perangkat ||--o{ maintenance_detail : "dikategorikan sebagai"
+> **Catatan:** Di lingkungan server/headless, pastikan Chromium terinstall. Puppeteer biasanya mengunduh Chromium sendiri saat `npm install`.
 
-    users {
-        uuid id PK "References auth.users"
-        text email "Unique email"
-        enum role "admin | teknisi"
-    }
-    teknisi {
-        uuid id PK, FK "References users.id"
-        text nama "Nama Lengkap"
-        text kontak "Nomor WhatsApp"
-        text kode_lokasi "Default Area"
-    }
-    client {
-        uuid id PK
-        text nama "Nama Perusahaan/Klien"
-        text kontak "Nomor WhatsApp"
-    }
-    kategori_perangkat {
-        uuid id PK
-        text kategori "Contoh: Hardware"
-        text nama_perangkat "Contoh: Printer"
-    }
-    maintenance {
-        uuid id PK
-        uuid teknisi FK "FK: teknisi.id"
-        uuid client FK "FK: client.id"
-        text kode_lokasi "Lokasi Pengerjaan"
-        timestamp tanggal_maintenance "Jadwal"
-        boolean status "false: Pending | true: Done"
-    }
-    maintenance_detail {
-        uuid id PK
-        uuid maintenance_id FK "FK: maintenance.id"
-        uuid kategori_perangkat_id FK "FK: kategori_perangkat.id"
-        text catatan_kerusakan "Detail masalah"
-    }
+```bash
+cd WhatsappGateway
+
+# Install dependencies
+npm install
+
+# Jalankan service
+npm start
 ```
 
-### Relasi Kunci
-- **One-to-One (`users` $\rightarrow$ `teknisi`):** Setiap pengguna dengan role 'teknisi' memiliki satu profil detail teknisi.
-- **One-to-Many (`maintenance` $\rightarrow$ `maintenance_detail`):** Satu sesi maintenance bisa mencakup pemeriksaan banyak perangkat sekaligus.
-- **One-to-Many (`teknisi` $\rightarrow$ `maintenance`):** Seorang teknisi bisa menangani banyak tugas pemeliharaan.
+### Proses Initial Setup
+
+1. Jalankan `npm start`
+2. Akan muncul **QR Code** di terminal
+3. Buka WhatsApp di ponsel → **Settings** → **Linked Devices** → **Link a Device**
+4. Scan QR Code yang muncul di terminal
+5. Session akan tersimpan di folder `.wwebjs_auth/session/` (persistent)
+
+### Cron Schedule
+
+| Jadwal (WITA) | Fungsi | Keterangan |
+|---------------|--------|------------|
+| 03:00 (daily) | Reminder H+0 | Maintenance hari ini → Teknisi |
+| 08:00 (daily) | Reminder H+1 | Maintenance besok → Teknisi + Klien |
 
 ---
 
-## 🔑 Catatan Implementasi untuk Junior
+## Deploy WhatsApp Fonnte (Netlify)
 
-### 1. Real-time Subscriptions (Supabase)
-Agar UI terupdate otomatis tanpa refresh, gunakan `channel`. Ini sangat krusial untuk aplikasi dashboard.
-```javascript
-// Contoh listener untuk perubahan status maintenance
-supabase
-  .channel('maintenance-updates')
-  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'maintenance' }, payload => {
-    console.log('Data berubah!', payload.new)
-    refreshUI() // Fungsi untuk update data di layar
-  })
-  .subscribe()
-```
+Fungsi ini berjalan sebagai **Netlify Scheduled Functions** (serverless).
 
-### 2. Keamanan dengan RLS (Row Level Security)
-Kita tidak hanya mengamankan frontend, tapi juga backend. Supabase RLS memastikan:
-- **Teknisi:** `SELECT` hanya jika `teknisi_id == auth.uid()`.
-- **Admin:** `ALL` access ke semua baris data.
+### Langkah-langkah:
 
-### 3. WhatsApp Gateway (Headless Browser)
-WhatsApp Gateway menggunakan Puppeteer yang menjalankan Chrome di latar belakang untuk mensimulasikan WhatsApp Web.
-- **Kelebihan:** Gratis (tidak bayar API resmi).
-- **Kekurangan:** Perlu menjaga sesi login tetap aktif (Session persistence).
+1. **Push ke GitHub** (atau Git provider lain)
+2. Buka [Netlify Dashboard](https://app.netlify.com) → **Add new site** → **Import from Git**
+3. Pilih repository, set:
+   - **Base directory:** `WhatsappFonnte`
+   - **Build command:** (kosongkan)
+   - **Publish directory:** (kosongkan)
+4. Set **Environment Variables** di Netlify:
+   - `SUPABASE_URL`
+   - `SUPABASE_KEY`
+   - `FONNTE_TOKEN`
+5. Deploy
+
+### Verifikasi
+
+Fungsi akan berjalan otomatis sesuai jadwal:
+- `remind-today`: 19:00 UTC (03:00 WITA) — Maintenance hari ini
+- `remind-tomorrow`: 00:00 UTC (08:00 WITA) — Maintenance besok
+
+Cek log di Netlify Dashboard → Functions → Function name → Logs.
 
 ---
-*Dokumentasi ini diperbarui untuk Tim Pengembangan MaintenApp.*
+
+## Deploy Dashboard ke Production
+
+### Opsi 1: Node.js Server (VPS/Cloud)
+
+```bash
+cd Dashboard
+
+# Build
+npm run build
+
+# Jalankan dengan PM2 (recommended)
+npm install -g pm2
+pm2 start .output/server/index.mjs --name maintenapp
+pm2 save
+pm2 startup
+```
+
+Aplikasi akan berjalan di port **3000** secara default. Gunakan reverse proxy (Nginx/Caddy) untuk production:
+
+```nginx
+# Contoh Nginx reverse proxy
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+### Opsi 2: Docker
+
+Buat `Dashboard/Dockerfile`:
+
+```dockerfile
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM node:22-alpine
+WORKDIR /app
+COPY --from=build /app/.output ./.output
+EXPOSE 3000
+CMD ["node", ".output/server/index.mjs"]
+```
+
+Build dan jalankan:
+
+```bash
+docker build -t maintenapp Dashboard/
+docker run -d -p 3000:3000 --env-file Dashboard/.env maintenapp
+```
+
+### Opsi 3: Platform as a Service (PaaS)
+
+**Vercel / Netlify / Railway / Render:**
+
+- Set build command: `npm run build`
+- Set publish directory: `.output/public`
+- Set environment variables di dashboard platform
+- Untuk Node.js render: entry point `.output/server/index.mjs`
+
+---
+
+## Pembuatan User Awal
+
+Sebelum aplikasi bisa digunakan, Anda perlu membuat user Admin dan Teknisi.
+
+### Metode 1: Script CLI
+
+```bash
+cd Dashboard
+
+# Edit file create_user.js — ganti email/password sesuai kebutuhan
+# Jalankan script
+node create_user.js
+```
+
+Script akan membuat user di Supabase Auth + tabel `users`.
+
+### Metode 2: Supabase Dashboard
+
+1. Buka **Supabase Dashboard** → **Authentication** → **Users** → **Invite user**
+2. Masukkan email, password akan dikirim via email
+3. Setelah user login, insert role ke tabel `users`:
+   - Buka **SQL Editor** → jalankan:
+   ```sql
+   INSERT INTO public.users (id, username, role)
+   VALUES ('user-uuid-from-auth', 'admin', 'Admin');
+   ```
+
+### Metode 3: Via Server Route
+
+Buat request POST ke endpoint admin (jika sudah ada):
+
+```bash
+curl -X POST http://localhost:3000/api/teknisi/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nama": "Admin Utama",
+    "email": "admin@example.com",
+    "password": "password123",
+    "kontak": "081234567890",
+    "kode_lokasi": "LOK-001"
+  }'
+```
+
+---
+
+## Troubleshooting
+
+| Masalah | Solusi |
+|---------|--------|
+| `Exec format error` (exit 126) | WSL drvfs issue. Gunakan `--ignore-scripts` + `sed` fix, atau pindah ke Linux native. |
+| `Cannot find module @supabase/supabase-js` | Jalankan `npm install` di folder yang benar. |
+| QR Code tidak muncul di WhatsApp Gateway | Hapus folder `.wwebjs_auth/session/` lalu restart. |
+| `FONNTE_TOKEN is not set` | Set environment variable `FONNTE_TOKEN` di Netlify. |
+| Foto gagal upload | Cek bucket `maintenance-photos` di Supabase Storage, pastikan ada dan RLS diizinkan. |
+| Login gagal "Invalid login credentials" | Pastikan user sudah dibuat di Supabase Auth dan `email_confirm: true`. |
+| Nuxt dev server error `Supabase is not defined` | Pastikan `.env` file ada dan berisi `SUPABASE_URL` dan `SUPABASE_KEY`. |
+
+---
+
+## Referensi Dokumentasi
+
+Dokumentasi teknis lengkap tersedia di folder [`@Docs/`](./@Docs/):
+
+| File | Isi |
+|------|-----|
+| [`@Docs/01-Arsitektur-Sistem.md`](./@Docs/01-Arsitektur-Sistem.md) | Arsitektur sistem, diagram komponen, teknologi, struktur direktori |
+| [`@Docs/02-Cara-Kerja-Sistem.md`](./@Docs/02-Cara-Kerja-Sistem.md) | Alur bisnis: login, CRUD maintenance, dashboard teknisi, notifikasi |
+| [`@Docs/03-Skema-Database.md`](./@Docs/03-Skema-Database.md) | ERD, detail tabel, tipe data, indeks, SQL DDL lengkap |
+| [`@Docs/04-API-Endpoint-Dokumentasi.md`](./@Docs/04-API-Endpoint-Dokumentasi.md) | Server routes, client-side query patterns, integrasi eksternal |
+| [`@Docs/05-Keamanan-Manajemen-State.md`](./@Docs/05-Keamanan-Manajemen-State.md) | Autentikasi, RLS, state management, error handling, checklist keamanan |
+| [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md) | Skema database (referensi awal — konten sudah diintegrasikan ke `@Docs/03`) |
+
+---
+
+*Dokumen ini diperbarui untuk Tim Pengembangan MaintenApp — 2026*
