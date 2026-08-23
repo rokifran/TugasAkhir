@@ -25,5 +25,10 @@
     "happy-dom": "^20.10.6",
     "jsdom": "^29.1.1",
     "vitest": "^4.1.9"
+  },
+  "allowScripts": {
+    "vue-demi@0.14.10": true,
+    "esbuild@0.27.7": true,
+    "esbuild@0.28.2": true
   }
 }
