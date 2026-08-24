@@ -96,7 +96,7 @@ Cara mendapatkan kunci dari Supabase Dashboard:
 
 ```env
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=eyJhbGciOiJIUzI1NiIs...your-anon-key
+SUPABASE_KEY=your-anon-key
 ```
 
 ### 3. WhatsApp Fonnte (Environment Variables di Netlify)
