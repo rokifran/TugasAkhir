@@ -364,4 +364,4 @@ Dokumentasi teknis lengkap tersedia di folder [`Docs/`](./Docs/):
 
 ---
 
-*Dokumen ini diperbarui untuk Tim Pengembangan MaintenApp — 2026*
+*Dokumen ini diperbarui untuk Tim Pengembangan MaintenApp — 2026-8*
