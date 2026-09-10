@@ -29,3 +29,7 @@ logs
 .wwebjs_auth
 .wwebjs_core
 .wwebjs_cache
+
+# Test artifacts
+coverage
+.nyc_output
