@@ -50,7 +50,8 @@ erDiagram
         uuid id PK "Primary key"
         bigint maintenance_id FK "Reference ke maintenance.id"
         bigint kategori_perangkat_id FK "Reference ke kategori_perangkat.id"
-        text catatan_kerusakan "Catatan masalah/kerusakan"
+        text jenis_maintenance "Rutin | Korektif (default Rutin)"
+        text catatan_kerusakan "Catatan masalah/kerusakan (opsional)"
         timestamptz created_at "Waktu pembuatan record"
     }
 
@@ -159,7 +160,8 @@ Detail perangkat yang diperiksa dalam satu sesi maintenance.
 | `id` | `uuid` | `PRIMARY KEY DEFAULT gen_random_uuid()` | ID unik |
 | `maintenance_id` | `bigint` | `FOREIGN KEY REFERENCES maintenance(id) ON DELETE CASCADE` | Induk maintenance |
 | `kategori_perangkat_id` | `bigint` | `FOREIGN KEY REFERENCES kategori_perangkat(id)` | Perangkat yang diperiksa |
-| `catatan_kerusakan` | `text` | | Catatan masalah |
+| `jenis_maintenance` | `text` | `NOT NULL DEFAULT 'Rutin' CHECK (jenis_maintenance IN ('Rutin','Korektif'))` | Jenis penanganan: rutin (perawatan berkala) atau korektif (perbaikan kerusakan) — **input aturan rule-based prioritas** |
+| `catatan_kerusakan` | `text` | | Catatan masalah (opsional, info untuk teknisi) |
 | `created_at` | `timestamptz` | `DEFAULT now()` | Timestamp |
 
 **Indeks:**
@@ -260,6 +262,7 @@ CREATE TABLE public.maintenance_detail (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   maintenance_id BIGINT NOT NULL REFERENCES public.maintenance(id) ON DELETE CASCADE,
   kategori_perangkat_id BIGINT NOT NULL REFERENCES public.kategori_perangkat(id),
+  jenis_maintenance TEXT NOT NULL DEFAULT 'Rutin' CHECK (jenis_maintenance IN ('Rutin', 'Korektif')),
   catatan_kerusakan TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );

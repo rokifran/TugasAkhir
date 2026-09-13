@@ -2,6 +2,7 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const cron = require('node-cron');
 const supabase = require('./supabase');
+const { evaluasiPrioritas } = require('./prioritas');
 
 (async () => {
     const { error } = await supabase.from('teknisi').select('count', { count: 'exact', head: true });
@@ -46,7 +47,7 @@ client.on('ready', async () => {
     });
 
     // Schedule task at 08:00 AM every day (Tomorrow's reminders)
-    cron.schedule('39 11 * * *', async () => {
+    cron.schedule('0 8 * * *', async () => {
         console.log('Running daily "tomorrow" reminder task at 08:00 AM...');
         await sendTomorrowMaintenanceReminders();
     }, {
@@ -111,13 +112,16 @@ async function sendMaintenanceReminders() {
         const { data: maintenanceJobs, error } = await supabase
             .from('maintenance')
             .select(`
+                tanggal_maintenance,
                 kode_lokasi,
                 teknisi (
                     nama,
                     kontak
                 ),
                 maintenance_detail (
+                    jenis_maintenance,
                     kategori_perangkat (
+                        kategori,
                         nama_perangkat
                     )
                 )
@@ -147,9 +151,10 @@ async function sendMaintenanceReminders() {
                 .filter(Boolean);
             const devicesStr = deviceNames.length > 0 ? deviceNames.join(', ') : 'Tidak ada perangkat';
             const techName = job.teknisi?.nama || 'Teknisi';
+            const prioritas = evaluasiPrioritas(job, today);
 
             const chatId = formatPhoneNumber(contact);
-            const message = `Halo ${techName}, jangan lupa ada maintenance hari ini di ${job.kode_lokasi} untuk perangkat: ${devicesStr}.`;
+            const message = `Halo ${techName}, jangan lupa ada maintenance hari ini di ${job.kode_lokasi} [Prioritas: ${prioritas.toUpperCase()}] untuk perangkat: ${devicesStr}.`;
 
             await safeSendMessage(chatId, message, `technician ${contact}`);
         }
@@ -163,6 +168,7 @@ async function sendMaintenanceReminders() {
  */
 async function sendTomorrowMaintenanceReminders() {
     try {
+        const today = new Date().toISOString().split('T')[0];
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const tomorrowStr = tomorrow.toISOString().split('T')[0];
@@ -171,6 +177,7 @@ async function sendTomorrowMaintenanceReminders() {
         const { data: maintenanceJobs, error } = await supabase
             .from('maintenance')
             .select(`
+                tanggal_maintenance,
                 kode_lokasi,
                 teknisi ( 
                     nama,
@@ -181,7 +188,8 @@ async function sendTomorrowMaintenanceReminders() {
                     kontak 
                 ),
                 maintenance_detail (
-                    kategori_perangkat ( nama_perangkat )
+                    jenis_maintenance,
+                    kategori_perangkat ( kategori, nama_perangkat )
                 )
             `)
             .eq('tanggal_maintenance', tomorrowStr)
@@ -209,7 +217,8 @@ async function sendTomorrowMaintenanceReminders() {
             if (techContact) {
                 const techName = job.teknisi?.nama || 'Teknisi';
                 const techChatId = formatPhoneNumber(techContact);
-                const techMessage = `Halo ${techName}, jangan lupa ada maintenance besok di ${job.kode_lokasi} untuk perangkat: ${devicesStr}.`;
+                const prioritas = evaluasiPrioritas(job, today);
+                const techMessage = `Halo ${techName}, jangan lupa ada maintenance besok di ${job.kode_lokasi} [Prioritas: ${prioritas.toUpperCase()}] untuk perangkat: ${devicesStr}.`;
                 await safeSendMessage(techChatId, techMessage, `technician ${techContact}`);
             }
 

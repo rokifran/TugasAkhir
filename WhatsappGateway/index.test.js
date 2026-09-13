@@ -4,7 +4,9 @@ jest.mock('whatsapp-web.js', () => ({
 }));
 
 jest.mock('./supabase', () => ({
-  from: jest.fn()
+  from: jest.fn(() => ({
+    select: jest.fn(() => Promise.resolve({ data: [], error: null })),
+  })),
 }));
 
 jest.mock('qrcode-terminal', () => ({
@@ -153,15 +155,16 @@ describe('sendMaintenanceReminders', () => {
     spy.mockRestore();
   });
 
-  test('sends reminder to technician', async () => {
+  test('sends reminder to technician with priority label', async () => {
     mockClient.isRegisteredUser.mockResolvedValue(true);
     const { from } = buildSupabaseChain([
       {
+        tanggal_maintenance: '2026-07-04',
         kode_lokasi: 'LOC001',
         teknisi: { nama: 'Budi', kontak: '081234567890' },
         maintenance_detail: [
-          { kategori_perangkat: { nama_perangkat: 'Router' } },
-          { kategori_perangkat: { nama_perangkat: 'Switch' } }
+          { jenis_maintenance: 'Rutin', kategori_perangkat: { kategori: 'Network', nama_perangkat: 'Router' } },
+          { jenis_maintenance: 'Rutin', kategori_perangkat: { kategori: 'Network', nama_perangkat: 'Switch' } }
         ]
       }
     ], null);
@@ -169,11 +172,31 @@ describe('sendMaintenanceReminders', () => {
     await gateway.sendMaintenanceReminders();
     expect(mockClient.sendMessage).toHaveBeenCalledWith(
       '6281234567890@c.us', expect.stringContaining('Router, Switch'));
+    expect(mockClient.sendMessage).toHaveBeenCalledWith(
+      '6281234567890@c.us', expect.stringContaining('[Prioritas: TINGGI]'));
+  });
+
+  test('sends priority label for corrective CCTV job (Sedang)', async () => {
+    mockClient.isRegisteredUser.mockResolvedValue(true);
+    const { from } = buildSupabaseChain([
+      {
+        tanggal_maintenance: '2026-07-04',
+        kode_lokasi: 'LOC007',
+        teknisi: { nama: 'Dedi', kontak: '081234567890' },
+        maintenance_detail: [
+          { jenis_maintenance: 'Korektif', kategori_perangkat: { kategori: 'CCTV', nama_perangkat: 'DVR' } }
+        ]
+      }
+    ], null);
+    mockSupabase.from.mockImplementation(from);
+    await gateway.sendMaintenanceReminders();
+    expect(mockClient.sendMessage).toHaveBeenCalledWith(
+      '6281234567890@c.us', expect.stringContaining('[Prioritas: SEDANG]'));
   });
 
   test('skips when contact missing', async () => {
     const { from } = buildSupabaseChain([
-      { kode_lokasi: 'LOC002', teknisi: { nama: 'Siti', kontak: null }, maintenance_detail: [] }
+      { tanggal_maintenance: '2026-07-04', kode_lokasi: 'LOC002', teknisi: { nama: 'Siti', kontak: null }, maintenance_detail: [] }
     ], null);
     mockSupabase.from.mockImplementation(from);
     const spy = jest.spyOn(console, 'warn').mockImplementation();
@@ -185,18 +208,20 @@ describe('sendMaintenanceReminders', () => {
   test('shows "Tidak ada perangkat" for empty detail', async () => {
     mockClient.isRegisteredUser.mockResolvedValue(true);
     const { from } = buildSupabaseChain([
-      { kode_lokasi: 'LOC003', teknisi: { nama: 'Andi', kontak: '081234567890' }, maintenance_detail: [] }
+      { tanggal_maintenance: '2026-07-04', kode_lokasi: 'LOC003', teknisi: { nama: 'Andi', kontak: '081234567890' }, maintenance_detail: [] }
     ], null);
     mockSupabase.from.mockImplementation(from);
     await gateway.sendMaintenanceReminders();
     expect(mockClient.sendMessage).toHaveBeenCalledWith(
       '6281234567890@c.us', expect.stringContaining('Tidak ada perangkat'));
+    expect(mockClient.sendMessage).toHaveBeenCalledWith(
+      '6281234567890@c.us', expect.stringContaining('[Prioritas: TINGGI]'));
   });
 
   test('uses "Teknisi" fallback', async () => {
     mockClient.isRegisteredUser.mockResolvedValue(true);
     const { from } = buildSupabaseChain([
-      { kode_lokasi: 'LOC004', teknisi: { kontak: '081234567890' }, maintenance_detail: [] }
+      { tanggal_maintenance: '2026-07-04', kode_lokasi: 'LOC004', teknisi: { kontak: '081234567890' }, maintenance_detail: [] }
     ], null);
     mockSupabase.from.mockImplementation(from);
     await gateway.sendMaintenanceReminders();
@@ -231,14 +256,15 @@ describe('sendTomorrowMaintenanceReminders', () => {
     spy.mockRestore();
   });
 
-  test('sends to both tech and client', async () => {
+  test('sends to both tech and client — tech gets priority, client does not', async () => {
     mockClient.isRegisteredUser.mockResolvedValue(true);
     const { from } = buildSupabaseChain([
       {
+        tanggal_maintenance: '2026-07-05',
         kode_lokasi: 'LOC001',
         teknisi: { nama: 'Budi', kontak: '081234567890' },
         client: { nama: 'PT ABC', kontak: '089876543210' },
-        maintenance_detail: [{ kategori_perangkat: { nama_perangkat: 'Router' } }]
+        maintenance_detail: [{ jenis_maintenance: 'Rutin', kategori_perangkat: { kategori: 'Network', nama_perangkat: 'Router' } }]
       }
     ], null);
     mockSupabase.from.mockImplementation(from);
@@ -247,14 +273,39 @@ describe('sendTomorrowMaintenanceReminders', () => {
     expect(mockClient.sendMessage).toHaveBeenCalledWith(
       '6281234567890@c.us', expect.stringContaining('Halo Budi'));
     expect(mockClient.sendMessage).toHaveBeenCalledWith(
+      '6281234567890@c.us', expect.stringContaining('[Prioritas: SEDANG]'));
+    expect(mockClient.sendMessage).toHaveBeenCalledWith(
       '6289876543210@c.us', expect.stringContaining('Halo PT ABC'));
+    expect(mockClient.sendMessage).toHaveBeenCalledWith(
+      '6289876543210@c.us', expect.not.stringContaining('[Prioritas:'));
+  });
+
+  test('corrective Network job for tomorrow → Tinggi (R2 mendahului R7)', async () => {
+    mockClient.isRegisteredUser.mockResolvedValue(true);
+    const { from } = buildSupabaseChain([
+      {
+        tanggal_maintenance: '2026-07-05',
+        kode_lokasi: 'LOC009',
+        teknisi: { nama: 'Edo', kontak: '081234567890' },
+        client: { nama: 'PT GHI', kontak: '089876543210' },
+        maintenance_detail: [
+          { jenis_maintenance: 'Korektif', kategori_perangkat: { kategori: 'Network', nama_perangkat: 'Router' } }
+        ]
+      }
+    ], null);
+    mockSupabase.from.mockImplementation(from);
+    await gateway.sendTomorrowMaintenanceReminders();
+    expect(mockClient.sendMessage).toHaveBeenCalledWith(
+      '6281234567890@c.us', expect.stringContaining('[Prioritas: TINGGI]'));
+    expect(mockClient.sendMessage).toHaveBeenCalledWith(
+      '6289876543210@c.us', expect.stringContaining('Halo PT GHI'));
   });
 
   test('skips tech when contact missing', async () => {
     mockClient.isRegisteredUser.mockResolvedValue(true);
     const { from } = buildSupabaseChain([
       {
-        kode_lokasi: 'LOC002', teknisi: { nama: 'Siti', kontak: null },
+        tanggal_maintenance: '2026-07-05', kode_lokasi: 'LOC002', teknisi: { nama: 'Siti', kontak: null },
         client: { nama: 'PT XYZ', kontak: '089876543210' }, maintenance_detail: []
       }
     ], null);
@@ -269,7 +320,7 @@ describe('sendTomorrowMaintenanceReminders', () => {
     mockClient.isRegisteredUser.mockResolvedValue(true);
     const { from } = buildSupabaseChain([
       {
-        kode_lokasi: 'LOC003', teknisi: { nama: 'Andi', kontak: '081234567890' },
+        tanggal_maintenance: '2026-07-05', kode_lokasi: 'LOC003', teknisi: { nama: 'Andi', kontak: '081234567890' },
         client: { nama: 'PT DEF', kontak: null }, maintenance_detail: []
       }
     ], null);
@@ -284,14 +335,14 @@ describe('sendTomorrowMaintenanceReminders', () => {
     mockClient.isRegisteredUser.mockResolvedValue(true);
     const { from } = buildSupabaseChain([
       {
-        kode_lokasi: 'LOC001', teknisi: { nama: 'Budi', kontak: '081234567890' },
+        tanggal_maintenance: '2026-07-05', kode_lokasi: 'LOC001', teknisi: { nama: 'Budi', kontak: '081234567890' },
         client: { nama: 'PT ABC', kontak: '089876543210' },
-        maintenance_detail: [{ kategori_perangkat: { nama_perangkat: 'Router' } }]
+        maintenance_detail: [{ jenis_maintenance: 'Rutin', kategori_perangkat: { kategori: 'Network', nama_perangkat: 'Router' } }]
       },
       {
-        kode_lokasi: 'LOC002', teknisi: { nama: 'Siti', kontak: '082345678901' },
+        tanggal_maintenance: '2026-07-05', kode_lokasi: 'LOC002', teknisi: { nama: 'Siti', kontak: '082345678901' },
         client: { nama: 'PT XYZ', kontak: null },
-        maintenance_detail: [{ kategori_perangkat: { nama_perangkat: 'Switch' } }]
+        maintenance_detail: [{ jenis_maintenance: 'Rutin', kategori_perangkat: { kategori: 'Network', nama_perangkat: 'Switch' } }]
       }
     ], null);
     mockSupabase.from.mockImplementation(from);
@@ -303,7 +354,7 @@ describe('sendTomorrowMaintenanceReminders', () => {
     mockClient.isRegisteredUser.mockResolvedValue(true);
     const { from } = buildSupabaseChain([
       {
-        kode_lokasi: 'LOC004', teknisi: { nama: 'Dewi', kontak: '081234567890' },
+        tanggal_maintenance: '2026-07-05', kode_lokasi: 'LOC004', teknisi: { nama: 'Dewi', kontak: '081234567890' },
         client: { kontak: '089876543210' }, maintenance_detail: []
       }
     ], null);

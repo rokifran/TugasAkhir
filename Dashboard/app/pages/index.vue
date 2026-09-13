@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { evaluasiPrioritas, STYLE_BADGE_PRIORITAS } from '../utils/prioritas'
 
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
@@ -38,6 +39,7 @@ const deleteRecordLabel = ref('')
 const evidenceModalOpen = ref(false)
 const evidenceLoading = ref(false)
 const evidencePhotos = ref([])
+const evidenceRecord = ref(null)
 
 // Fullscreen Modal state
 const fullscreenPhoto = ref(null)
@@ -113,7 +115,7 @@ async function getMaintenanceData() {
         id, created_at, status, kode_lokasi, tanggal_maintenance,
         teknisi:teknisi_id(id, nama, kontak, users(is_active)),
         client:client_id(id, nama, kontak),
-        maintenance_detail(id, catatan_kerusakan, kategori_perangkat:kategori_perangkat_id(id, kategori, nama_perangkat))
+        maintenance_detail(id, catatan_kerusakan, jenis_maintenance, kategori_perangkat:kategori_perangkat_id(id, kategori, nama_perangkat))
       `, hasSearch ? {} : { count: 'exact' })
 
     if (!hasSearch) {
@@ -225,6 +227,7 @@ async function insertMaintenance() {
       const details = validDevices.map(d => ({
         maintenance_id: newRecord.id,
         kategori_perangkat_id: d.kategori_perangkat_id,
+        jenis_maintenance: d.jenis_maintenance || 'Rutin',
         catatan_kerusakan: d.catatan_kerusakan.trim()
       }))
       const { error: detailError } = await supabase
@@ -259,6 +262,7 @@ function openEditModal(record) {
   formDevices.value = record.maintenance_detail
     ? record.maintenance_detail.map(d => ({
         kategori_perangkat_id: d.kategori_perangkat_id,
+        jenis_maintenance: d.jenis_maintenance || 'Rutin',
         catatan_kerusakan: d.catatan_kerusakan || ''
       }))
     : []
@@ -304,6 +308,7 @@ async function updateMaintenance() {
       const details = validDevices.map(d => ({
         maintenance_id: editRecordId.value,
         kategori_perangkat_id: d.kategori_perangkat_id,
+        jenis_maintenance: d.jenis_maintenance || 'Rutin',
         catatan_kerusakan: d.catatan_kerusakan.trim()
       }))
       const { error: detailError } = await supabase
@@ -356,6 +361,7 @@ async function deleteMaintenance() {
 
 async function openEvidenceModal(record) {
   evidencePhotos.value = []
+  evidenceRecord.value = record
   evidenceModalOpen.value = true
   evidenceLoading.value = true
 
@@ -368,8 +374,18 @@ async function openEvidenceModal(record) {
 
     const { data, error } = await supabase
       .from('maintenance_photos')
-      .select('photo_url')
+      .select(`
+        photo_url,
+        created_at,
+        maintenance_detail_id,
+        maintenance_detail (
+          jenis_maintenance,
+          catatan_kerusakan,
+          kategori_perangkat ( kategori, nama_perangkat )
+        )
+      `)
       .in('maintenance_detail_id', detailIds)
+      .order('created_at', { ascending: false })
 
     if (error) throw error
     evidencePhotos.value = data || []
@@ -381,8 +397,13 @@ async function openEvidenceModal(record) {
   }
 }
 
-function openFullscreen(photoUrl) {
-  fullscreenPhoto.value = photoUrl
+// Foto meri satu perangkat (dihitung on-the-fly saat render)
+function fotosPerangkat(detailId) {
+  return evidencePhotos.value.filter(p => p.maintenance_detail_id === detailId)
+}
+
+function openFullscreen(photo) {
+  fullscreenPhoto.value = photo
   fullscreenOpen.value = true
   // Tutup sementara modal bukti agar Focus Trap tidak mencegat event klik pada fullscreen preview
   evidenceModalOpen.value = false
@@ -396,12 +417,31 @@ function closeFullscreen() {
 }
 
 // Helper methods for devices form
+const jenisPerangkatOptions = [
+  { label: 'Rutin (perawatan berkala)', value: 'Rutin' },
+  { label: 'Korektif (perbaikan kerusakan)', value: 'Korektif' }
+]
+
 function addDeviceField() {
-  formDevices.value.push({ kategori_perangkat_id: null, catatan_kerusakan: '' })
+  formDevices.value.push({ kategori_perangkat_id: null, jenis_maintenance: 'Rutin', catatan_kerusakan: '' })
 }
 
 function removeDeviceField(index) {
   formDevices.value.splice(index, 1)
+}
+
+// Info prioritas untuk badge (rule-based, dihitung on-the-fly)
+function prioritasInfo(record) {
+  const level = evaluasiPrioritas(record)
+  const style = STYLE_BADGE_PRIORITAS[level] || STYLE_BADGE_PRIORITAS.Rendah
+  return { level, ...style }
+}
+
+// Daftar perangkat lengkap untuk tooltip (nama + jenis + catatan)
+function daftarPerangkat(record) {
+  return (record.maintenance_detail || [])
+    .map(d => `${d.kategori_perangkat?.kategori ?? '?'} - ${d.kategori_perangkat?.nama_perangkat ?? '?'} (${d.jenis_maintenance === 'Korektif' ? 'Korektif' : 'Rutin'})${d.catatan_kerusakan ? `: ${d.catatan_kerusakan}` : ''}`)
+    .join('\n')
 }
 
 // Computed options for selects
@@ -598,6 +638,7 @@ watch(user, (newUser) => {
                     Status <span class="material-symbols-outlined text-[12px]">{{ statusSort === 'asc' ? 'arrow_upward' : statusSort === 'desc' ? 'arrow_downward' : 'swap_vert' }}</span>
                   </div>
                 </th>
+                <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Prioritas</th>
                 <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Teknisi</th>
                 <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Client</th>
                 <th class="px-lg py-md text-secondary font-label-bold uppercase text-[11px] tracking-widest border-b border-surface-variant">Perangkat</th>
@@ -608,10 +649,10 @@ watch(user, (newUser) => {
             </thead>
             <tbody class="divide-y divide-surface-variant">
               <tr v-if="loading" class="bg-surface-container-lowest">
-                <td colspan="9" class="px-lg py-xl text-center text-secondary">Loading...</td>
+                <td colspan="10" class="px-lg py-xl text-center text-secondary">Loading...</td>
               </tr>
               <tr v-else-if="maintenanceRecords.length === 0" class="bg-surface-container-lowest">
-                <td colspan="9" class="px-lg py-xl text-center text-secondary">No Data Found.</td>
+                <td colspan="10" class="px-lg py-xl text-center text-secondary">No Data Found.</td>
               </tr>
               <tr v-else v-for="record in maintenanceRecords" :key="record.id" class="hover:bg-surface-container-low/30 transition-colors group">
                 <td class="px-lg py-md font-label-bold text-on-surface">#{{ record.id ?? '-' }}</td>
@@ -624,6 +665,15 @@ watch(user, (newUser) => {
                   <span v-else class="inline-flex items-center px-sm py-1 rounded-full bg-amber-50 text-amber-700 text-[10px] font-label-bold border border-amber-200 uppercase tracking-tighter">
                     <span class="w-1 h-1 rounded-full bg-amber-500 mr-1.5"></span>
                     Pending
+                  </span>
+                </td>
+                <td class="px-lg py-md">
+                  <span v-if="!record.status" class="inline-flex items-center px-sm py-1 rounded-full text-[10px] font-label-bold border uppercase tracking-tighter" :class="prioritasInfo(record).badge">
+                    <span class="w-1 h-1 rounded-full mr-1.5" :class="prioritasInfo(record).dot"></span>
+                    {{ prioritasInfo(record).level }}
+                  </span>
+                  <span v-else class="inline-flex items-center px-sm py-1 rounded-full bg-gray-100 text-gray-500 text-[10px] font-label-bold border border-gray-200 uppercase tracking-tighter">
+                    Selesai
                   </span>
                 </td>
                 <td class="px-lg py-md">
@@ -656,24 +706,25 @@ watch(user, (newUser) => {
                   </button>
                   <span v-else class="text-secondary">-</span>
                 </td>
-                <td class="px-lg py-md">
-                  <div class="flex flex-col gap-1">
-                    <div 
-                      v-for="detail in record.maintenance_detail" 
-                      :key="detail.id"
-                      class="text-sm flex flex-col"
-                    >
-                      <span class="font-medium text-on-surface">
-                        {{ detail.kategori_perangkat?.kategori }} - {{ detail.kategori_perangkat?.nama_perangkat }}
+                <td class="px-lg py-md max-w-[240px]">
+                  <button
+                    v-if="record.maintenance_detail?.length"
+                    @click="openEvidenceModal(record)"
+                    :title="daftarPerangkat(record)"
+                    class="w-full cursor-pointer hover:bg-surface-variant rounded-md transition-colors flex items-center gap-1.5 whitespace-nowrap px-sm py-1"
+                  >
+                    <span class="font-medium text-on-surface truncate inline-flex items-center gap-1.5">
+                      {{ record.maintenance_detail[0].kategori_perangkat?.kategori }} - {{ record.maintenance_detail[0].kategori_perangkat?.nama_perangkat }}
+                      <span
+                        class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border tracking-tighter"
+                        :class="record.maintenance_detail[0].jenis_maintenance === 'Korektif' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'"
+                      >
+                        {{ record.maintenance_detail[0].jenis_maintenance === 'Korektif' ? 'Korektif' : 'Rutin' }}
                       </span>
-                      <span class="text-[11px] text-secondary italic" v-if="detail.catatan_kerusakan">
-                        "{{ detail.catatan_kerusakan }}"
-                      </span>
-                    </div>
-                    <span v-if="!record.maintenance_detail || record.maintenance_detail.length === 0" class="text-secondary text-[11px] italic">
-                      Tidak ada perangkat
                     </span>
-                  </div>
+                    <span v-if="record.maintenance_detail.length > 1" class="text-[11px] text-secondary ml-1">+{{ record.maintenance_detail.length - 1 }} lainnya</span>
+                  </button>
+                  <span v-else class="text-secondary text-[11px] italic">Tidak ada perangkat</span>
                 </td>
                 <td class="px-lg py-md font-bold text-on-surface text-sm">{{ record.kode_lokasi || '-' }}</td>
                 <td class="px-lg py-md text-secondary text-sm">
@@ -781,18 +832,54 @@ watch(user, (newUser) => {
           <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin mb-2" />
           <p class="text-sm">Loading images...</p>
         </div>
-        <div v-else-if="evidencePhotos.length === 0" class="flex flex-col items-center justify-center py-12 text-secondary">
+        <div v-else-if="!evidenceRecord?.maintenance_detail || evidenceRecord.maintenance_detail.length === 0" class="flex flex-col items-center justify-center py-12 text-secondary">
           <UIcon name="i-heroicons-photo" class="w-8 h-8 mb-2 opacity-50" />
           <p class="text-sm">Tidak ada bukti foto tersedia.</p>
         </div>
-        <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          <div v-for="(photo, index) in evidencePhotos" :key="index" class="aspect-square rounded-xl overflow-hidden border border-surface-variant group relative cursor-pointer">
-            <img 
-              :src="photo.photo_url" 
-              class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
-              @click="openFullscreen(photo.photo_url)"
-            />
+        <div v-else class="space-y-6">
+          <div 
+            v-for="detail in evidenceRecord.maintenance_detail" 
+            :key="detail.id"
+            class="rounded-2xl border border-surface-variant bg-surface-container-lowest overflow-hidden"
+          >
+            <!-- Header Perangkat -->
+            <div class="px-lg py-md border-b border-surface-variant bg-surface-container-low/50 flex items-center gap-sm flex-wrap">
+              <span class="material-symbols-outlined text-[16px] text-secondary">devices</span>
+              <p class="font-label-bold text-on-surface text-[14px]">
+                {{ detail.kategori_perangkat?.kategori }} - {{ detail.kategori_perangkat?.nama_perangkat }}
+              </p>
+              <span
+                class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border tracking-tighter"
+                :class="detail.jenis_maintenance === 'Korektif' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'"
+              >
+                {{ detail.jenis_maintenance === 'Korektif' ? 'Korektif' : 'Rutin' }}
+              </span>
+            </div>
+            <!-- Catatan Kerusakan -->
+            <div v-if="detail.catatan_kerusakan" class="px-lg py-md border-b border-surface-variant">
+              <p class="text-[12px] text-secondary italic">"{{ detail.catatan_kerusakan }}"</p>
+            </div>
+            <!-- Foto Perangkat -->
+            <div v-if="fotosPerangkat(detail.id).length > 0" class="p-lg">
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div 
+                  v-for="(photo, index) in fotosPerangkat(detail.id)" 
+                  :key="photo.id || index" 
+                  class="aspect-square rounded-xl overflow-hidden border border-surface-variant group relative cursor-pointer"
+                >
+                  <img 
+                    :src="photo.photo_url" 
+                    class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    loading="lazy"
+                    @click="openFullscreen(photo)"
+                  />
+                </div>
+              </div>
+            </div>
+            <div v-else class="flex items-center justify-center gap-xs px-lg py-md text-secondary text-sm italic">
+              <span class="material-symbols-outlined text-[16px]">photo_library</span>
+              Belum ada bukti foto
+            </div>
           </div>
         </div>
       </template>
@@ -883,6 +970,13 @@ watch(user, (newUser) => {
                     v-model="device.kategori_perangkat_id"
                     :items="kategoriPerangkatOptions"
                     placeholder="Pilih perangkat..."
+                    value-key="value"
+                    class="w-full"
+                  />
+                  <USelectMenu
+                    v-model="device.jenis_maintenance"
+                    :items="jenisPerangkatOptions"
+                    :default-value="'Rutin'"
                     value-key="value"
                     class="w-full"
                   />
@@ -1005,6 +1099,13 @@ watch(user, (newUser) => {
                     value-key="value"
                     class="w-full"
                   />
+                  <USelectMenu
+                    v-model="device.jenis_maintenance"
+                    :items="jenisPerangkatOptions"
+                    :default-value="'Rutin'"
+                    value-key="value"
+                    class="w-full"
+                  />
                   <UInput
                     v-model="device.catatan_kerusakan"
                     placeholder="Catatan kerusakan (opsional)..."
@@ -1076,10 +1177,22 @@ watch(user, (newUser) => {
         >
           <div class="relative w-[90vw] h-[90vh] max-w-[800px] max-h-[800px]" @click.stop>
             <img 
-              :src="fullscreenPhoto" 
+              :src="fullscreenPhoto?.photo_url" 
               class="w-full h-full object-contain cursor-zoom-out"
               @click="closeFullscreen"
             />
+            <!-- Caption Perangkat -->
+            <div v-if="fullscreenPhoto" class="absolute bottom-2 left-2 right-2 flex items-center gap-sm px-3 py-1.5 bg-black/70 text-white text-[13px] rounded-lg z-50">
+              <span class="material-symbols-outlined text-[16px]">devices</span>
+              <span class="font-medium">{{ fullscreenPhoto.maintenance_detail?.kategori_perangkat?.kategori }} - {{ fullscreenPhoto.maintenance_detail?.kategori_perangkat?.nama_perangkat }}</span>
+              <span
+                class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full border tracking-tighter"
+                :class="fullscreenPhoto.maintenance_detail?.jenis_maintenance === 'Korektif' ? 'bg-amber-400/20 text-amber-300 border-amber-400/40' : 'bg-emerald-400/20 text-emerald-300 border-emerald-400/40'"
+              >
+                {{ fullscreenPhoto.maintenance_detail?.jenis_maintenance === 'Korektif' ? 'Korektif' : 'Rutin' }}
+              </span>
+              <p v-if="fullscreenPhoto.maintenance_detail?.catatan_kerusakan" class="flex-1 text-right text-[12px] italic truncate">"{{ fullscreenPhoto.maintenance_detail.catatan_kerusakan }}"</p>
+            </div>
             <!-- Close Button -->
             <button 
               @click="closeFullscreen"

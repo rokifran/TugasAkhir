@@ -192,7 +192,7 @@ const query = supabase
     id, created_at, status, kode_lokasi, tanggal_maintenance,
     teknisi:teknisi_id(id, nama, kontak, users(is_active)),
     client:client_id(id, nama, kontak),
-    maintenance_detail(id, catatan_kerusakan, 
+    maintenance_detail(id, catatan_kerusakan, jenis_maintenance,
       kategori_perangkat:kategori_perangkat_id(id, kategori, nama_perangkat))
   `, { count: 'exact' })
   .range(from, to)            // Pagination
@@ -212,7 +212,7 @@ const query = supabase
       "teknisi": { "id": "uuid", "nama": "Ahmad", "kontak": "081234567890", "users": { "is_active": true } },
       "client": { "id": "uuid", "nama": "PT Maju", "kontak": "021-123456" },
       "maintenance_detail": [
-        { "id": "uuid", "catatan_kerusakan": "Tidak bisa nyala", "kategori_perangkat": { "id": 1, "kategori": "Hardware", "nama_perangkat": "Printer" } }
+        { "id": "uuid", "catatan_kerusakan": "Tidak bisa nyala", "jenis_maintenance": "Korektif", "kategori_perangkat": { "id": 1, "kategori": "Printer", "nama_perangkat": "Printer Biasa" } }
       ]
     }
   ],
@@ -377,9 +377,21 @@ const { error } = await supabase.storage
 ```typescript
 const { data } = await supabase
   .from('maintenance_photos')
-  .select('photo_url')
+  .select(`
+    photo_url,
+    created_at,
+    maintenance_detail_id,
+    maintenance_detail (
+      jenis_maintenance,
+      catatan_kerusakan,
+      kategori_perangkat ( kategori, nama_perangkat )
+    )
+  `)
   .in('maintenance_detail_id', detailIds)
+  .order('created_at', { ascending: false })
 ```
+
+> **Catatan:** Relasi `maintenance_detail` di-join agar modal "lihat bukti" bisa menampilkan foto **dikelompokkan per perangkat** (nama perangkat, jenis Rutin/Korektif, dan catatan) dibandingan dengan flat list URL foto.
 
 ---
 
@@ -400,9 +412,11 @@ Service ini **tidak memiliki REST API** — berjalan sebagai background service 
 | 08:00 WITA (00:00 UTC) | `sendTomorrowMaintenanceReminders()` | Kirim pengingat maintenance BESOK ke teknisi + klien |
 
 **Format Pesan:**
-- **Ke Teknisi (H+0):** `Halo [nama], jangan lupa ada maintenance hari ini di [lokasi] untuk perangkat: [daftar].`
-- **Ke Teknisi (H+1):** `Halo [nama], jangan lupa ada maintenance besok di [lokasi] untuk perangkat: [daftar].`
-- **Ke Klien (H+1):** `Halo [nama], kami menginformasikan bahwa akan ada jadwal maintenance besok di lokasi Anda. Mohon kesediaannya.`
+- **Ke Teknisi (H+0):** `Halo [nama], jangan lupa ada maintenance hari ini di [lokasi] [Prioritas: X] untuk perangkat: [daftar].`
+- **Ke Teknisi (H+1):** `Halo [nama], jangan lupa ada maintenance besok di [lokasi] [Prioritas: X] untuk perangkat: [daftar].`
+- **Ke Klien (H+1):** `Halo [nama], kami menginformasikan bahwa akan ada jadwal maintenance besok di lokasi Anda. Mohon kesediaannya.` *(tanpa label prioritas — informasi internal)*
+
+> **Catatan:** Label prioritas dihitung per job dengan algoritma rule-based IF-THEN (lihat `Docs/02-Cara-Kerja-Sistem.md` §2.7). Select query gateway kini menyertakan `tanggal_maintenance`, `maintenance_detail.jenis_maintenance`, dan `kategori_perangkat.kategori` sebagai input aturan. Karena query memfilter tanggal persis (hari ini/besok), aturan R1 (terlambat → Mendesak) tidak pernah menyala di notifikasi — prioritas "Mendesak" hanya muncul di dashboard untuk job yang terlambat.
 
 ### 4.4.2 Fonnte API
 

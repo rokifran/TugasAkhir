@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { evaluasiPrioritas, STYLE_BADGE_PRIORITAS } from '../utils/prioritas'
 
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
@@ -26,10 +27,18 @@ const loading = ref(false)
 const errorMsg = ref(null)
 const uploadingDetails = ref({})
 
+// Info prioritas untuk badge (rule-based, dihitung on-the-fly)
+function prioritasInfo(record) {
+  const level = evaluasiPrioritas(record)
+  const style = STYLE_BADGE_PRIORITAS[level] || STYLE_BADGE_PRIORITAS.Rendah
+  return { level, ...style }
+}
+
 // Evidence Modal state
 const evidenceModalOpen = ref(false)
 const evidenceLoading = ref(false)
 const evidencePhotos = ref([])
+const evidenceRecord = ref(null)
 
 async function logout() {
   await supabase.auth.signOut()
@@ -234,6 +243,7 @@ async function markAsCompleted(record) {
 
 async function openEvidenceModal(record) {
   evidencePhotos.value = []
+  evidenceRecord.value = record
   evidenceModalOpen.value = true
   evidenceLoading.value = true
 
@@ -246,8 +256,19 @@ async function openEvidenceModal(record) {
 
     const { data, error } = await supabase
       .from('maintenance_photos')
-      .select('id, photo_url')
+      .select(`
+        id,
+        photo_url,
+        created_at,
+        maintenance_detail_id,
+        maintenance_detail (
+          jenis_maintenance,
+          catatan_kerusakan,
+          kategori_perangkat ( kategori, nama_perangkat )
+        )
+      `)
       .in('maintenance_detail_id', detailIds)
+      .order('created_at', { ascending: false })
 
     if (error) throw error
     evidencePhotos.value = data || []
@@ -259,11 +280,16 @@ async function openEvidenceModal(record) {
   }
 }
 
+// Foto meri satu perangkat (dihitung on-the-fly saat render)
+function fotosPerangkat(detailId) {
+  return evidencePhotos.value.filter(p => p.maintenance_detail_id === detailId)
+}
+
 const fullscreenPhoto = ref(null)
 const fullscreenOpen = ref(false)
 
-function openFullscreen(photoUrl) {
-  fullscreenPhoto.value = photoUrl
+function openFullscreen(photo) {
+  fullscreenPhoto.value = photo
   fullscreenOpen.value = true
   // Tutup sementara modal bukti agar Focus Trap tidak mencegat event klik pada fullscreen preview
   evidenceModalOpen.value = false
@@ -436,6 +462,10 @@ onMounted(() => {
                       <span class="w-1 h-1 rounded-full bg-amber-500 mr-1.5"></span>
                       Pending
                     </span>
+                    <span v-if="!record.status" class="inline-flex items-center px-sm py-1 rounded-full text-[10px] font-label-bold border uppercase tracking-tighter" :class="prioritasInfo(record).badge">
+                      <span class="w-1 h-1 rounded-full mr-1.5" :class="prioritasInfo(record).dot"></span>
+                      {{ prioritasInfo(record).level }}
+                    </span>
                 </div>
                 <div class="flex flex-wrap items-center gap-md text-secondary text-[12px]">
                   <span class="flex items-center gap-xs">
@@ -468,12 +498,18 @@ onMounted(() => {
                 <!-- Vertical Status Bar (Kiri) -->
                 <div 
                   class="absolute left-0 top-0 bottom-0 w-2"
-                  :class="detail.catatan_kerusakan ? 'bg-[#EAB308]' : 'bg-[#22C55E]'"
+                  :class="detail.jenis_maintenance === 'Korektif' ? 'bg-[#EAB308]' : 'bg-[#22C55E]'"
                 ></div>
                 
                 <div class="pl-2">
-                  <p class="font-label-bold text-on-surface text-[14px]">
+                  <p class="font-label-bold text-on-surface text-[14px] flex items-center gap-sm flex-wrap">
                       {{ detail.kategori_perangkat?.kategori }} - {{ detail.kategori_perangkat?.nama_perangkat }}
+                      <span
+                        class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border tracking-tighter"
+                        :class="detail.jenis_maintenance === 'Korektif' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'"
+                      >
+                        {{ detail.jenis_maintenance === 'Korektif' ? 'Korektif' : 'Rutin' }}
+                      </span>
                   </p>
                   <p v-if="detail.catatan_kerusakan" class="text-secondary text-[12px] italic mt-1">
                       "{{ detail.catatan_kerusakan }}"
@@ -535,26 +571,62 @@ onMounted(() => {
           <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin mb-2" />
           <p class="text-sm">Loading images...</p>
         </div>
-        <div v-else-if="evidencePhotos.length === 0" class="flex flex-col items-center justify-center py-12 text-secondary">
+        <div v-else-if="!evidenceRecord?.maintenance_detail || evidenceRecord.maintenance_detail.length === 0" class="flex flex-col items-center justify-center py-12 text-secondary">
           <UIcon name="i-heroicons-photo" class="w-8 h-8 mb-2 opacity-50" />
           <p class="text-sm">Tidak ada bukti foto tersedia.</p>
         </div>
-        <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          <div v-for="(photo, index) in evidencePhotos" :key="index" class="aspect-square rounded-xl overflow-hidden border border-surface-variant group relative cursor-pointer">
-            <img 
-              :src="photo.photo_url" 
-              class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
-              @click="openFullscreen(photo.photo_url)"
-            />
-            <!-- Delete Button Overlay -->
-            <button 
-              @click.stop="deletePhoto(photo.id, photo.photo_url)"
-              class="absolute top-2 right-2 bg-red-500 bg-opacity-70 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
-              aria-label="Hapus foto"
-            >
-              <span class="material-symbols-outlined text-[18px]">delete</span>
-            </button>
+        <div v-else class="space-y-6">
+          <div 
+            v-for="detail in evidenceRecord.maintenance_detail" 
+            :key="detail.id"
+            class="rounded-2xl border border-surface-variant bg-surface-container-lowest overflow-hidden"
+          >
+            <!-- Header Perangkat -->
+            <div class="px-lg py-md border-b border-surface-variant bg-surface-container-low/50 flex items-center gap-sm flex-wrap">
+              <span class="material-symbols-outlined text-[16px] text-secondary">devices</span>
+              <p class="font-label-bold text-on-surface text-[14px]">
+                {{ detail.kategori_perangkat?.kategori }} - {{ detail.kategori_perangkat?.nama_perangkat }}
+              </p>
+              <span
+                class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border tracking-tighter"
+                :class="detail.jenis_maintenance === 'Korektif' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'"
+              >
+                {{ detail.jenis_maintenance === 'Korektif' ? 'Korektif' : 'Rutin' }}
+              </span>
+            </div>
+            <!-- Catatan Kerusakan -->
+            <div v-if="detail.catatan_kerusakan" class="px-lg py-md border-b border-surface-variant">
+              <p class="text-[12px] text-secondary italic">"{{ detail.catatan_kerusakan }}"</p>
+            </div>
+            <!-- Foto Perangkat -->
+            <div v-if="fotosPerangkat(detail.id).length > 0" class="p-lg">
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div 
+                  v-for="(photo, index) in fotosPerangkat(detail.id)" 
+                  :key="photo.id || index" 
+                  class="aspect-square rounded-xl overflow-hidden border border-surface-variant group relative cursor-pointer"
+                >
+                  <img 
+                    :src="photo.photo_url" 
+                    class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    loading="lazy"
+                    @click="openFullscreen(photo)"
+                  />
+                  <!-- Delete Button Overlay -->
+                  <button 
+                    @click.stop="deletePhoto(photo.id, photo.photo_url)"
+                    class="absolute top-2 right-2 bg-red-500 bg-opacity-70 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                    aria-label="Hapus foto"
+                  >
+                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div v-else class="flex items-center justify-center gap-xs px-lg py-md text-secondary text-sm italic">
+              <span class="material-symbols-outlined text-[16px]">photo_library</span>
+              Belum ada bukti foto
+            </div>
           </div>
         </div>
       </template>
@@ -583,10 +655,22 @@ onMounted(() => {
         >
           <div class="relative w-[90vw] h-[90vh] max-w-[800px] max-h-[800px]" @click.stop>
             <img 
-              :src="fullscreenPhoto" 
+              :src="fullscreenPhoto?.photo_url" 
               class="w-full h-full object-contain cursor-zoom-out"
               @click="closeFullscreen"
             />
+            <!-- Caption Perangkat -->
+            <div v-if="fullscreenPhoto" class="absolute bottom-2 left-2 right-2 flex items-center gap-sm px-3 py-1.5 bg-black/70 text-white text-[13px] rounded-lg z-50">
+              <span class="material-symbols-outlined text-[16px]">devices</span>
+              <span class="font-medium">{{ fullscreenPhoto.maintenance_detail?.kategori_perangkat?.kategori }} - {{ fullscreenPhoto.maintenance_detail?.kategori_perangkat?.nama_perangkat }}</span>
+              <span
+                class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full border tracking-tighter"
+                :class="fullscreenPhoto.maintenance_detail?.jenis_maintenance === 'Korektif' ? 'bg-amber-400/20 text-amber-300 border-amber-400/40' : 'bg-emerald-400/20 text-emerald-300 border-emerald-400/40'"
+              >
+                {{ fullscreenPhoto.maintenance_detail?.jenis_maintenance === 'Korektif' ? 'Korektif' : 'Rutin' }}
+              </span>
+              <p v-if="fullscreenPhoto.maintenance_detail?.catatan_kerusakan" class="flex-1 text-right text-[12px] italic truncate">"{{ fullscreenPhoto.maintenance_detail.catatan_kerusakan }}"</p>
+            </div>
             <!-- Close Button -->
             <button 
               @click="closeFullscreen"

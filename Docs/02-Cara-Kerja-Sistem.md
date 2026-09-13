@@ -330,3 +330,77 @@ flowchart LR
 ```
 
 Search query menggunakan `useState('search-query')` sehingga state dibagikan antar halaman. Setiap halaman (index, client, teknisi) melakukan filtering client-side pada data yang sudah di-fetch.
+
+---
+
+## 2.7 Penentuan Prioritas Maintenance (Algoritma Rule-Based IF-THEN)
+
+Sistem menentukan **prioritas/urgensi** setiap job maintenance menggunakan **basis aturan IF-THEN** dengan evaluasi *single-pass* dan *first-match precedence*: aturan diperiksa berurutan dari R1, dan **aturan pertama yang kondisinya terpenuhi menentukan hasil**; jika tidak ada yang cocok, berlaku default (R8).
+
+### 2.7.1 Fakta (Data Masukan Aturan)
+
+Fakta diturunkan dari satu record maintenance (tanpa perubahan skema query khusus):
+
+| Fakta | Sumber | Keterangan |
+|-------|--------|------------|
+| `status` | `maintenance.status` | Pending / Completed |
+| `terlambat` | `maintenance.tanggal_maintenance` | Pending dan tanggal < hari ini |
+| `dueHariIni` | `maintenance.tanggal_maintenance` | Pending dan tanggal = hari ini |
+| `dueBesok` | `maintenance.tanggal_maintenance` | Pending dan tanggal = besok |
+| `adaKerusakan` | `maintenance_detail.jenis_maintenance` | Ada detail berjenis **Korektif** |
+| `kategoriTerparah` | `kategori_perangkat.kategori` | Kategori dengan keparahan tertinggi di antara detail Korektif (Network=Komputer > CCTV=Printer) |
+
+> `jenis_maintenance` (`Rutin` \| `Korektif`) adalah penanda eksplisit yang diisi admin per perangkat saat membuat/mengedit jadwal. Kolom `catatan_kerusakan` tetap ada sebagai **info bebas untuk teknisi** (opsional, tidak dipakai aturan).
+
+### 2.7.2 Basis Aturan (Rule Base)
+
+| Kode | IF | THEN |
+|------|----|------|
+| R1 | status = pending **AND** tanggal_maintenance < hari ini | **Mendesak** |
+| R2 | adaKerusakan **AND** kategori = Network | **Tinggi** |
+| R3 | adaKerusakan **AND** kategori = Komputer | **Tinggi** |
+| R4 | adaKerusakan **AND** kategori = CCTV | **Sedang** |
+| R5 | adaKerusakan **AND** kategori = Printer | **Sedang** |
+| R6 | status = pending **AND** tanggal_maintenance = hari ini | **Tinggi** |
+| R7 | status = pending **AND** tanggal_maintenance = besok | **Sedang** |
+| R8 | (default — tidak ada aturan yang cocok) | **Rendah** |
+
+Urutan prioritas: **Mendesak > Tinggi > Sedang > Rendah**. Job yang sudah selesai (`status = true`) langsung diberi Rendah (di UI ditampilkan sebagai "Selesai").
+
+### 2.7.3 Evaluasi
+
+```mermaid
+flowchart TD
+    A[Record maintenance dari DB] --> B[Turunkan fakta: status, terlambat, dueHariIni, dueBesok, adaKerusakan, kategoriTerparah]
+    B --> C{Rule R1?}
+    C -->|Ya| D[Mendesak]
+    C -->|Tidak| E{Rule R2?}
+    E -->|Ya| F[Tinggi]
+    E -->|Tidak| G{Rule R3?}
+    G -->|Ya| F
+    G -->|Tidak| H{Rule R4?}
+    H -->|Ya| I[Sedang]
+    H -->|Tidak| J{Rule R5?}
+    J -->|Ya| I
+    J -->|Tidak| K{Rule R6?}
+    K -->|Ya| F
+    K -->|Tidak| L{Rule R7?}
+    L -->|Ya| I
+    L -->|Tidak| M[Rendah]
+```
+
+### 2.7.4 Implementasi & Integrasi
+
+- **Rule base statis & deklaratif** (aturan sebagai data, bukan kode tersebar):
+  - `Dashboard/app/utils/prioritas.ts` — ESM/TS, dipakai halaman admin & teknisi
+  - `WhatsappGateway/prioritas.js` — CommonJS, dipakai fungsi reminder (duplikat sadar karena kedua service independen, sesuai struktur proyek)
+- **Dashboard admin** (`index.vue`): kolom "Prioritas" berbadge berwarna (Merah=Mendesak, Oranye=Tinggi, Kuning=Sedang, Hijau=Rendah; abu="Selesai"); form perangkat kini memiliki dropdown **Jenis: Rutin/Korektif**
+- **Dashboard teknisi** (`teknisi-dashboard.vue`): badge prioritas di header task card + label jenis per perangkat (bar kuning = Korektif, hijau = Rutin)
+- **WhatsApp Gateway** (`index.js`): pesan reminder teknisi menyertakan `[Prioritas: X]`; **pesan klien tidak diberi label**
+- **Perhitungan on-the-fly**: prioritas dihitung setiap render — perubahan data otomatis mengubah prioritas tanpa data basi tersimpan
+
+### 2.7.5 Catatan Perilaku
+
+1. Query gateway memfilter tanggal persis (hari ini/besok) sehingga **R1 (Mendesak) tidak pernah muncul di notifikasi WhatsApp** — prioritas Mendesak hanya tampil di dashboard untuk job yang terlambat dikerjakan.
+2. Job multi-perangkat mengambil kategori terparah di antara perangkat berjenis Korektif (mis. campuran Printer rusak + Server rusak → prioritas dari Komputer/Server).
+3. Aturan disimpan statis di kode dengan struktur deklaratif; jika di kemudian hari ingin dikelola admin, aturan dapat dipindah ke tabel database tanpa menulis ulang evaluator.
