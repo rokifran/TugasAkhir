@@ -5,20 +5,29 @@
 .nitro
 .cache
 dist
+.nuxt-analyze
 
 # Node dependencies
-node_modules
+node_modules/
 
 # Logs
 logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Misc
+# Misc / editors
 .DS_Store
 .fleet
 .idea
 .kilo
 .playwright-mcp
+*.swp
+*.swo
+.vscode/
 
 # Local env files
 .env
@@ -33,3 +42,20 @@ logs
 # Test artifacts
 coverage
 .nyc_output
+
+# Netlify local build cache
+.netlify/
+
+# Added by code-review-graph
+.code-review-graph/
+
+# graphify generated outputs
+graphify-out/
+
+# Downloaded agent skills (re-installable via skills-lock.json)
+.agents/
+
+# Archify deliverables (generated; source spec = archify/*.json)
+archify/*.html
+archify/*.visual-check.*
+archify/*.png

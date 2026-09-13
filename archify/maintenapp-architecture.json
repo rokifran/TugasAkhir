@@ -1,0 +1,363 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "MaintenApp — Arsitektur Sistem",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "main-flow",
+        "label": "Jalur utama CRUD",
+        "focus": [
+          "adminUI",
+          "db",
+          "nuxtSrv"
+        ],
+        "note": "Lacak jalur utama maintenance dari browser hingga PostgreSQL."
+      },
+      {
+        "id": "notifications",
+        "label": "Notifikasi WhatsApp",
+        "focus": [
+          "db",
+          "gateway",
+          "fonnte",
+          "fonnteApi",
+          "waUsers"
+        ],
+        "note": "Dua layanan notifikasi terpisah dan redundan."
+      },
+      {
+        "id": "security",
+        "label": "Keamanan",
+        "focus": [
+          "auth",
+          "db",
+          "nuxtSrv"
+        ],
+        "note": "JWT via Supabase Auth, RLS per tabel, dan service_role oleh server routes."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "adminUI",
+      "type": "frontend",
+      "label": "Admin Dashboard",
+      "sublabel": "/ · CRUD maintenance",
+      "pos": [
+        60,
+        200
+      ],
+      "size": [
+        190,
+        80
+      ]
+    },
+    {
+      "id": "teknisiUI",
+      "type": "frontend",
+      "label": "Dashboard Teknisi",
+      "sublabel": "/teknisi-dashboard",
+      "pos": [
+        60,
+        560
+      ],
+      "size": [
+        190,
+        80
+      ]
+    },
+    {
+      "id": "storage",
+      "type": "cloud",
+      "label": "Supabase Storage",
+      "sublabel": "bucket: maintenance-photos",
+      "pos": [
+        490,
+        470
+      ],
+      "size": [
+        210,
+        76
+      ]
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "Supabase Auth",
+      "sublabel": "email + password · JWT",
+      "pos": [
+        490,
+        90
+      ],
+      "size": [
+        210,
+        76
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "users · teknisi · maintenance",
+      "pos": [
+        490,
+        300
+      ],
+      "size": [
+        210,
+        92
+      ]
+    },
+    {
+      "id": "nuxtSrv",
+      "type": "backend",
+      "label": "Nuxt Server Routes",
+      "sublabel": "/api/teknisi/*",
+      "tag": "service_role",
+      "pos": [
+        270,
+        380
+      ],
+      "size": [
+        190,
+        90
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "backend",
+      "label": "WhatsApp Gateway",
+      "sublabel": "Puppeteer · whatsapp-web.js",
+      "tag": "03:00 · 08:00 WITA",
+      "pos": [
+        800,
+        300
+      ],
+      "size": [
+        230,
+        90
+      ]
+    },
+    {
+      "id": "fonnte",
+      "type": "backend",
+      "label": "WhatsApp Fonnte",
+      "sublabel": "Netlify Scheduled Functions",
+      "pos": [
+        800,
+        540
+      ],
+      "size": [
+        230,
+        90
+      ]
+    },
+    {
+      "id": "fonnteApi",
+      "type": "external",
+      "label": "Fonnte API",
+      "sublabel": "api.fonnte.com",
+      "pos": [
+        1130,
+        540
+      ],
+      "size": [
+        220,
+        74
+      ]
+    },
+    {
+      "id": "waUsers",
+      "type": "external",
+      "label": "Teknisi & Klien",
+      "sublabel": "penerima pesan WhatsApp",
+      "pos": [
+        1105,
+        300
+      ],
+      "size": [
+        210,
+        92
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Browser (Client)",
+      "wraps": [
+        "adminUI",
+        "teknisiUI"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Nuxt 4 Server Routes",
+      "wraps": [
+        "nuxtSrv"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Supabase BaaS",
+      "wraps": [
+        "storage",
+        "auth",
+        "db"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Row Level Security (RLS)",
+      "wraps": [
+        "db"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Layanan Notifikasi (Decoupled)",
+      "wraps": [
+        "gateway",
+        "fonnte"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "admin-teknisi-api",
+      "from": "adminUI",
+      "to": "nuxtSrv",
+      "label": "create · delete · activate teknisi",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "admin-crud",
+      "from": "adminUI",
+      "to": "db",
+      "label": "CRUD via anon key + RLS",
+      "labelDy": -16,
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "teknisi-update",
+      "from": "teknisiUI",
+      "to": "db",
+      "label": "update status",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "admin-foto",
+      "from": "adminUI",
+      "to": "storage",
+      "label": "upload · get URL foto",
+      "fromSide": "left",
+      "toSide": "bottom",
+      "via": [
+        [
+          20,
+          240
+        ],
+        [
+          20,
+          780
+        ],
+        [
+          595,
+          780
+        ],
+        [
+          595,
+          560
+        ]
+      ]
+    },
+    {
+      "id": "nuxt-db",
+      "from": "nuxtSrv",
+      "to": "db",
+      "label": "service_role · bypass RLS",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "top"
+    },
+    {
+      "id": "gw-select",
+      "from": "gateway",
+      "to": "db",
+      "label": "SELECT due",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "fonnte-select",
+      "from": "fonnte",
+      "to": "db",
+      "label": "SELECT due",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "gw-message",
+      "from": "gateway",
+      "to": "waUsers",
+      "label": "sendMessage",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelDx": 15
+    },
+    {
+      "id": "fonnte-push",
+      "from": "fonnte",
+      "to": "fonnteApi",
+      "label": "sendFonnte",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        1080,
+        591
+      ]
+    },
+    {
+      "id": "fonnte-api-wa",
+      "from": "fonnteApi",
+      "to": "waUsers",
+      "label": "kirim pesan WhatsApp",
+      "fromSide": "top",
+      "toSide": "bottom"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Klien (Web)",
+      "items": [
+        "Dashboard Nuxt 4 (SSR/SPA) untuk admin & teknisi",
+        "Login email + password oleh Supabase Auth → token JWT",
+        "Teknisi update status + bukti foto pada tabel maintenance"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Backend (BaaS)",
+      "items": [
+        "Supabase: Auth, PostgreSQL, Storage, RLS per tabel",
+        "Server routes /api/teknisi/* memakai service_role (bypass RLS)"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Notifikasi WhatsApp",
+      "items": [
+        "WhatsApp Gateway (Puppeteer) — 03:00 & 08:00 WITA",
+        "Kedua layanan menyeleksi jadwal WHERE status=false",
+        "WhatsApp Fonnte (Netlify) sebagai fallback redundan",
+        "Nomor dinormalisasi 08xxx → 628xxx@c.us"
+      ]
+    }
+  ]
+}
