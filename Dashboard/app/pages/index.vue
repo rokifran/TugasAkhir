@@ -781,7 +781,7 @@ watch(user, (newUser) => {
     </template>
 
     <!-- Detail Modal for Teknisi / Client -->
-    <UModal v-model:open="detailModalOpen" :title="detailModalTitle" :description="'Full record details'" :ui="{ content: 'sm:max-w-2xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-2xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
+    <UModal v-model:open="detailModalOpen" :title="detailModalTitle" :description="'Full record details'" scrollable :ui="{ content: 'max-w-[calc(100vw-2rem)] sm:max-w-2xl bg-surface dark:bg-[#1e2235]', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div v-if="detailModalData" class="space-y-4">
           <div v-for="(value, key) in detailModalData" :key="key" class="space-y-1.5">
@@ -826,7 +826,7 @@ watch(user, (newUser) => {
     </UModal>
 
     <!-- Evidence Modal -->
-    <UModal v-model:open="evidenceModalOpen" title="Bukti Maintenance" description="View all photos related to this maintenance record." :ui="{ content: 'sm:max-w-3xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-3xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
+    <UModal v-model:open="evidenceModalOpen" title="Bukti Maintenance" description="View all photos related to this maintenance record." scrollable :ui="{ content: 'max-w-[calc(100vw-2rem)] sm:max-w-3xl bg-surface dark:bg-[#1e2235]', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div v-if="evidenceLoading" class="flex flex-col items-center justify-center py-12 text-secondary">
           <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin mb-2" />
@@ -891,7 +891,7 @@ watch(user, (newUser) => {
     </UModal>
 
     <!-- Insert Maintenance Record Modal -->
-    <UModal v-model:open="insertModalOpen" title="Add Maintenance Record" description="Fill in the details to create a new maintenance record." :ui="{ content: 'sm:max-w-3xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-3xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
+    <UModal v-model:open="insertModalOpen" title="Add Maintenance Record" description="Fill in the details to create a new maintenance record." scrollable :ui="{ content: 'max-w-[calc(100vw-2rem)] sm:max-w-3xl bg-surface dark:bg-[#1e2235]', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="insertError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="insertError" />
@@ -1009,7 +1009,7 @@ watch(user, (newUser) => {
     </UModal>
 
     <!-- Edit Maintenance Record Modal -->
-    <UModal v-model:open="editModalOpen" title="Edit Maintenance Record" description="Update the maintenance record details." :ui="{ content: 'sm:max-w-3xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-3xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
+    <UModal v-model:open="editModalOpen" title="Edit Maintenance Record" description="Update the maintenance record details." scrollable :ui="{ content: 'max-w-[calc(100vw-2rem)] sm:max-w-3xl bg-surface dark:bg-[#1e2235]', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="editError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="editError" />
@@ -1135,7 +1135,7 @@ watch(user, (newUser) => {
     </UModal>
 
     <!-- Delete Confirmation Modal -->
-    <UModal v-model:open="deleteModalOpen" title="Delete Record" description="This action cannot be undone." :ui="{ content: 'sm:max-w-2xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-2xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
+    <UModal v-model:open="deleteModalOpen" title="Delete Record" description="This action cannot be undone." scrollable :ui="{ content: 'max-w-[calc(100vw-2rem)] sm:max-w-2xl bg-surface dark:bg-[#1e2235]', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div class="space-y-5">
           <UAlert v-if="deleteError" icon="i-heroicons-exclamation-triangle" color="error" variant="soft" :title="deleteError" />

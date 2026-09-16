@@ -565,7 +565,7 @@ onMounted(() => {
    </main>
 
     <!-- Evidence Modal -->
-    <UModal v-model:open="evidenceModalOpen" title="Bukti Maintenance" description="View all photos related to this maintenance record." :ui="{ content: 'sm:max-w-3xl w-full bg-surface dark:bg-[#1e2235]', width: 'sm:max-w-3xl w-full', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
+    <UModal v-model:open="evidenceModalOpen" title="Bukti Maintenance" description="View all photos related to this maintenance record." scrollable :ui="{ content: 'max-w-[calc(100vw-2rem)] sm:max-w-3xl bg-surface dark:bg-[#1e2235]', overlay: 'bg-[#0f111a]/50 dark:bg-black/80', title: 'text-gray-900 dark:text-white', description: 'text-gray-500 dark:text-gray-300' }">
       <template #body>
         <div v-if="evidenceLoading" class="flex flex-col items-center justify-center py-12 text-secondary">
           <UIcon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin mb-2" />

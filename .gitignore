@@ -28,6 +28,7 @@ lerna-debug.log*
 *.swp
 *.swo
 .vscode/
+.obsidian/
 
 # Local env files
 .env
@@ -59,3 +60,4 @@ graphify-out/
 archify/*.html
 archify/*.visual-check.*
 archify/*.png
+TA
